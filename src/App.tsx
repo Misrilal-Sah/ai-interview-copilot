@@ -47,7 +47,9 @@ function App() {
     providerStates,
     activeVisionProvider,
     activeTextProvider,
-    refreshKeyStatus
+    refreshKeyStatus,
+    setModelForProvider,
+    reorderProviders
   } = useProviderManager()
 
   // ── Hover-based click-through ────────────────────────────────────────────
@@ -212,6 +214,9 @@ function App() {
                 setLanguage={updateLanguage}
                 activeVisionProvider={activeVisionProvider}
                 activeTextProvider={activeTextProvider}
+                providerStates={providerStates}
+                setModelForProvider={setModelForProvider}
+                reorderProviders={reorderProviders}
               />
             ) : (
               // Transparent while loading — never a solid black block

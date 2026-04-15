@@ -52,12 +52,11 @@ const SolutionSection = ({
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = () => {
-    if (typeof content === "string") {
-      navigator.clipboard.writeText(content).then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      })
-    }
+    if (typeof content !== "string") return
+    // Use native Electron clipboard — no DOM manipulation, no flicker
+    window.electronAPI.writeClipboard(content)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+      .catch(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
   }
 
   return (
@@ -77,22 +76,27 @@ const SolutionSection = ({
         <div className="w-full relative">
           <button
             onClick={copyToClipboard}
-            className="absolute top-2 right-2 text-xs text-white bg-white/10 hover:bg-white/20 rounded px-2 py-1 transition"
+            style={{ position: "absolute", top: 8, right: 8, zIndex: 10, pointerEvents: "all" }}
+            className="text-xs text-white bg-white/20 hover:bg-white/30 backdrop-blur rounded px-2 py-1 transition select-none"
           >
-            {copied ? "Copied!" : "Copy"}
+            {copied ? "✓ Copied" : "Copy"}
           </button>
           <SyntaxHighlighter
             showLineNumbers
-            language={currentLanguage == "golang" ? "go" : currentLanguage}
+            language={currentLanguage === "golang" ? "go" : currentLanguage}
             style={dracula}
             customStyle={{
               maxWidth: "100%",
               margin: 0,
               padding: "1rem",
+              paddingTop: "2.5rem",
               whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-              backgroundColor: "rgba(22, 27, 34, 0.5)"
+              wordBreak: "break-word",
+              backgroundColor: "rgba(22, 27, 34, 0.75)",
+              userSelect: "text",
+              WebkitUserSelect: "text"
             }}
+            codeTagProps={{ style: { userSelect: "text", WebkitUserSelect: "text" } }}
             wrapLongLines={true}
           >
             {content as string}
@@ -192,9 +196,6 @@ const Solutions: React.FC<SolutionsProps> = ({
     null
   )
 
-  const [isTooltipVisible, setIsTooltipVisible] = useState(false)
-  const [tooltipHeight, setTooltipHeight] = useState(0)
-
   const [isResetting, setIsResetting] = useState(false)
 
   interface Screenshot {
@@ -234,11 +235,11 @@ const Solutions: React.FC<SolutionsProps> = ({
     // Height update logic
     const updateDimensions = () => {
       if (contentRef.current) {
-        let contentHeight = contentRef.current.scrollHeight
+        const maxHeight = Math.floor(window.screen.height * 0.82)
+        // Cap the reported height so the Electron window doesn't grow offscreen.
+        // The div itself scrolls internally via overflow-y: auto.
+        const contentHeight = Math.min(contentRef.current.scrollHeight, maxHeight)
         const contentWidth = contentRef.current.scrollWidth
-        if (isTooltipVisible) {
-          contentHeight += tooltipHeight
-        }
         window.electronAPI.updateContentDimensions({
           width: contentWidth,
           height: contentHeight
@@ -390,7 +391,7 @@ const Solutions: React.FC<SolutionsProps> = ({
       resizeObserver.disconnect()
       cleanupFunctions.forEach((cleanup) => cleanup())
     }
-  }, [isTooltipVisible, tooltipHeight])
+  }, [])
 
   useEffect(() => {
     // -- Load initial state from query cache on mount --
@@ -435,11 +436,6 @@ const Solutions: React.FC<SolutionsProps> = ({
     return () => unsubscribe()
   }, [queryClient])
 
-  const handleTooltipVisibilityChange = (visible: boolean, height: number) => {
-    setIsTooltipVisible(visible)
-    setTooltipHeight(height)
-  }
-
   const handleDeleteExtraScreenshot = async (index: number) => {
     const screenshotToDelete = extraScreenshots[index]
 
@@ -478,7 +474,17 @@ const Solutions: React.FC<SolutionsProps> = ({
           setLanguage={setLanguage}
         />
       ) : (
-        <div ref={contentRef} className="relative">
+        <div
+          ref={contentRef}
+          className="relative"
+          style={{
+            maxHeight: "82vh",
+            overflowY: "auto",
+            overflowX: "hidden",
+            userSelect: "text",
+            WebkitUserSelect: "text"
+          }}
+        >
           <div className="space-y-3 px-4 py-3">
           {/* Conditionally render the screenshot queue if solutionData is available */}
           {solutionData && (
@@ -497,7 +503,6 @@ const Solutions: React.FC<SolutionsProps> = ({
 
           {/* Navbar of commands with the SolutionsHelper */}
           <SolutionCommands
-            onTooltipVisibilityChange={handleTooltipVisibilityChange}
             isProcessing={!problemStatementData || !solutionData}
             extraScreenshots={extraScreenshots}
             credits={credits}
@@ -505,10 +510,10 @@ const Solutions: React.FC<SolutionsProps> = ({
             setLanguage={setLanguage}
           />
 
-          {/* Main Content - Modified width constraints */}
-          <div className="w-full text-sm text-black bg-black/60 rounded-md">
+          {/* Main Content */}
+          <div className="w-full text-sm text-black bg-black/60 rounded-md" style={{ userSelect: "text", WebkitUserSelect: "text" }}>
             <div className="rounded-lg overflow-hidden">
-              <div className="px-4 py-3 space-y-4 max-w-full">
+              <div className="px-4 py-3 space-y-4 max-w-full" style={{ userSelect: "text", WebkitUserSelect: "text" }}>
                 {!solutionData && (
                   <>
                     <ContentSection
@@ -529,7 +534,7 @@ const Solutions: React.FC<SolutionsProps> = ({
                 {solutionData && (
                   <>
                     <ContentSection
-                      title={`My Thoughts (${COMMAND_KEY} + Arrow keys to scroll)`}
+                      title="My Thoughts"
                       content={
                         thoughtsData && (
                           <div className="space-y-3">
@@ -540,7 +545,7 @@ const Solutions: React.FC<SolutionsProps> = ({
                                   className="flex items-start gap-2"
                                 >
                                   <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
-                                  <div>{thought}</div>
+                                  <div style={{ userSelect: "text" }}>{thought}</div>
                                 </div>
                               ))}
                             </div>

@@ -3,6 +3,27 @@ import { useToast } from "../../contexts/toast"
 import { LanguageSelector } from "../shared/LanguageSelector"
 import { COMMAND_KEY } from "../../utils/platform"
 
+// DEFAULT_SHORTCUTS must match shortcuts.ts in the electron main process
+const DEFAULT_SHORTCUTS: Record<string, string> = {
+  takeScreenshot:      "CommandOrControl+H",
+  processScreenshots:  "CommandOrControl+Enter",
+  toggleVisibility:    "CommandOrControl+B",
+  resetSession:        "CommandOrControl+R",
+  deleteLastScreenshot:"CommandOrControl+L",
+}
+
+/**
+ * Parse a shortcut string (e.g. "CommandOrControl+Shift+H") into display badge parts.
+ * Returns an array like ["Ctrl", "Shift", "H"].
+ */
+function parseShortcutParts(raw: string): string[] {
+  return raw
+    .replace(/CommandOrControl/g, COMMAND_KEY)
+    .replace(/\bEnter\b/g, "↵")
+    .split("+")
+    .filter(Boolean)
+}
+
 // Must stay in sync with the options in LanguageSelector.tsx
 const LANGUAGE_VALUES = [
   "python", "javascript", "java", "golang", "cpp",
@@ -27,6 +48,29 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const tooltipRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
+
+  // Load custom shortcuts from store — re-display the correct keys
+  const [customShortcuts, setCustomShortcuts] = useState<Record<string, string>>({})
+  useEffect(() => {
+    window.electronAPI.getStoreValue("customShortcuts")
+      .then((v: unknown) => { if (v && typeof v === "object") setCustomShortcuts(v as Record<string, string>) })
+      .catch(() => {})
+  }, [])
+
+  /** Get shortcut parts for a given action key */
+  const getShortcutParts = (key: string): string[] =>
+    parseShortcutParts(customShortcuts[key] ?? DEFAULT_SHORTCUTS[key] ?? "")
+
+  /** Render shortcut key badge(s) for an action */
+  const ShortcutBadges = ({ actionKey }: { actionKey: string }) => (
+    <div className="flex gap-1">
+      {getShortcutParts(actionKey).map((part, i) => (
+        <button key={i} className="bg-white/10 rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
+          {part}
+        </button>
+      ))}
+    </div>
+  )
 
   // Cycle through the language list without mounting hidden React trees
   const cycleLanguage = (direction: 'next' | 'prev') => {
@@ -113,14 +157,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                 ? "Take fifth screenshot"
                 : "Next will replace first screenshot"}
             </span>
-            <div className="flex gap-1">
-              <button className="bg-white/10 rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                {COMMAND_KEY}
-              </button>
-              <button className="bg-white/10 rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                H
-              </button>
-            </div>
+            <ShortcutBadges actionKey="takeScreenshot" />
           </div>
 
           {/* Solve Command */}
@@ -149,13 +186,8 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] leading-none">Solve </span>
-                <div className="flex gap-1 ml-2">
-                  <button className="bg-white/10 rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                    {COMMAND_KEY}
-                  </button>
-                  <button className="bg-white/10 rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                    ↵
-                  </button>
+                <div className="ml-2">
+                  <ShortcutBadges actionKey="processScreenshots" />
                 </div>
               </div>
             </div>
@@ -231,12 +263,9 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="truncate">Toggle Window</span>
                           <div className="flex gap-1 flex-shrink-0">
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              {COMMAND_KEY}
-                            </span>
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              B
-                            </span>
+                            {getShortcutParts("toggleVisibility").map((p, i) => (
+                              <span key={i} className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">{p}</span>
+                            ))}
                           </div>
                         </div>
                         <p className="text-[10px] leading-relaxed text-white/70 truncate mt-1">
@@ -275,12 +304,9 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="truncate">Take Screenshot</span>
                           <div className="flex gap-1 flex-shrink-0">
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              {COMMAND_KEY}
-                            </span>
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              H
-                            </span>
+                            {getShortcutParts("takeScreenshot").map((p, i) => (
+                              <span key={i} className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">{p}</span>
+                            ))}
                           </div>
                         </div>
                         <p className="text-[10px] leading-relaxed text-white/70 truncate mt-1">
@@ -328,12 +354,9 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="truncate">Solve</span>
                           <div className="flex gap-1 flex-shrink-0">
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              {COMMAND_KEY}
-                            </span>
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              ↵
-                            </span>
+                            {getShortcutParts("processScreenshots").map((p, i) => (
+                              <span key={i} className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">{p}</span>
+                            ))}
                           </div>
                         </div>
                         <p className="text-[10px] leading-relaxed text-white/70 truncate mt-1">
@@ -368,12 +391,9 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="truncate">Delete Last Screenshot</span>
                           <div className="flex gap-1 flex-shrink-0">
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              {COMMAND_KEY}
-                            </span>
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              L
-                            </span>
+                            {getShortcutParts("deleteLastScreenshot").map((p, i) => (
+                              <span key={i} className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">{p}</span>
+                            ))}
                           </div>
                         </div>
                         <p className="text-[10px] leading-relaxed text-white/70 truncate mt-1">
@@ -386,29 +406,26 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
 
                     {/* Separator and Log Out */}
                     <div className="pt-3 mt-3 border-t border-white/10">
-                      {/* Simplified Language Selector */}
+                      {/* Language Selector — proper dropdown */}
                       <div className="mb-3 px-2">
-                        <div 
-                          className="flex items-center justify-between cursor-pointer hover:bg-white/10 rounded px-2 py-1 transition-colors"
-                          onClick={() => cycleLanguage('next')}
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                              cycleLanguage('prev');
-                            } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-                              cycleLanguage('next');
-                            }
-                          }}
-                        >
+                        <div className="flex items-center justify-between">
                           <span className="text-[11px] text-white/70">Language</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-white/90">{currentLanguage}</span>
-                            <div className="text-white/40 text-[8px]">
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                                <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
-                              </svg>
-                            </div>
-                          </div>
+                          <select
+                            value={currentLanguage}
+                            onChange={(e) => {
+                              const newLang = e.target.value
+                              setLanguage(newLang)
+                              window.electronAPI.updateConfig({ language: newLang })
+                            }}
+                            className="bg-black/80 text-white/90 rounded px-2 py-1 text-[11px] outline-none border border-white/10 focus:border-white/20 cursor-pointer"
+                            style={{ WebkitAppearance: "menulist", backgroundImage: "none" }}
+                          >
+                            {LANGUAGE_VALUES.map(lang => (
+                              <option key={lang} value={lang} className="bg-black text-white">
+                                {lang.charAt(0).toUpperCase() + lang.slice(1)}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
 

@@ -19,39 +19,62 @@ const CodeSection = ({
   code: React.ReactNode
   isLoading: boolean
   currentLanguage: string
-}) => (
-  <div className="space-y-2">
-    <h2 className="text-[13px] font-medium text-white tracking-wide">{title}</h2>
-    {isLoading ? (
-      <div className="space-y-1.5">
-        <div className="mt-4 flex">
-          <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-            Loading solutions...
-          </p>
+}) => {
+  const [copied, setCopied] = React.useState(false)
+
+  const copyToClipboard = () => {
+    if (typeof code !== "string") return
+    // Use native Electron clipboard — no DOM manipulation, no flicker
+    window.electronAPI.writeClipboard(code)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+      .catch(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-[13px] font-medium text-white tracking-wide">{title}</h2>
+      {isLoading ? (
+        <div className="space-y-1.5">
+          <div className="mt-4 flex">
+            <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+              Loading solutions...
+            </p>
+          </div>
         </div>
-      </div>
-    ) : (
-      <div className="w-full">
-        <SyntaxHighlighter
-          showLineNumbers
-          language={currentLanguage == "golang" ? "go" : currentLanguage}
-          style={dracula}
-          customStyle={{
-            maxWidth: "100%",
-            margin: 0,
-            padding: "1rem",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-            backgroundColor: "rgba(22, 27, 34, 0.5)"
-          }}
-          wrapLongLines={true}
-        >
-          {code as string}
-        </SyntaxHighlighter>
-      </div>
-    )}
-  </div>
-)
+      ) : (
+        <div className="w-full relative">
+          <button
+            onClick={copyToClipboard}
+            style={{ position: "absolute", top: 8, right: 8, zIndex: 10, pointerEvents: "all" }}
+            className="text-xs text-white bg-white/20 hover:bg-white/30 backdrop-blur rounded px-2 py-1 transition select-none"
+          >
+            {copied ? "✓ Copied" : "Copy"}
+          </button>
+          <SyntaxHighlighter
+            showLineNumbers
+            language={currentLanguage === "golang" ? "go" : currentLanguage}
+            style={dracula}
+            customStyle={{
+              maxWidth: "100%",
+              margin: 0,
+              padding: "1rem",
+              paddingTop: "2.5rem",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              backgroundColor: "rgba(22, 27, 34, 0.75)",
+              userSelect: "text",
+              WebkitUserSelect: "text"
+            }}
+            codeTagProps={{ style: { userSelect: "text", WebkitUserSelect: "text" } }}
+            wrapLongLines={true}
+          >
+            {code as string}
+          </SyntaxHighlighter>
+        </div>
+      )}
+    </div>
+  )
+}
 
 async function fetchScreenshots(): Promise<Screenshot[]> {
   try {
@@ -80,8 +103,6 @@ const Debug: React.FC<DebugProps> = ({
   currentLanguage,
   setLanguage
 }) => {
-  const [tooltipVisible, setTooltipVisible] = useState(false)
-  const [tooltipHeight, setTooltipHeight] = useState(0)
   const { showToast } = useToast()
 
   const { data: screenshots = [], refetch } = useQuery<Screenshot[]>({
@@ -206,14 +227,12 @@ const Debug: React.FC<DebugProps> = ({
       })
     ]
 
-    // Set up resize observer
+    // Set up resize observer — cap height at 82vh
     const updateDimensions = () => {
       if (contentRef.current) {
-        let contentHeight = contentRef.current.scrollHeight
+        const maxHeight = Math.floor(window.screen.height * 0.82)
+        const contentHeight = Math.min(contentRef.current.scrollHeight, maxHeight)
         const contentWidth = contentRef.current.scrollWidth
-        if (tooltipVisible) {
-          contentHeight += tooltipHeight
-        }
         window.electronAPI.updateContentDimensions({
           width: contentWidth,
           height: contentHeight
@@ -233,10 +252,6 @@ const Debug: React.FC<DebugProps> = ({
     }
   }, [queryClient, setIsProcessing])
 
-  const handleTooltipVisibilityChange = (visible: boolean, height: number) => {
-    setTooltipVisible(visible)
-    setTooltipHeight(height)
-  }
 
   const handleDeleteExtraScreenshot = async (index: number) => {
     const screenshotToDelete = screenshots[index]
@@ -257,7 +272,17 @@ const Debug: React.FC<DebugProps> = ({
   }
 
   return (
-    <div ref={contentRef} className="relative">
+    <div
+      ref={contentRef}
+      className="relative"
+      style={{
+        maxHeight: "82vh",
+        overflowY: "auto",
+        overflowX: "hidden",
+        userSelect: "text",
+        WebkitUserSelect: "text"
+      }}
+    >
       <div className="space-y-3 px-4 py-3">
       {/* Conditionally render the screenshot queue */}
       <div className="bg-transparent w-fit">
@@ -275,7 +300,6 @@ const Debug: React.FC<DebugProps> = ({
       {/* Navbar of commands with the tooltip */}
       <SolutionCommands
         screenshots={screenshots}
-        onTooltipVisibilityChange={handleTooltipVisibilityChange}
         isProcessing={isProcessing}
         extraScreenshots={screenshots}
         credits={window.__CREDITS__}

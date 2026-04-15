@@ -18,25 +18,58 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
-  X, Eye, EyeOff, GripVertical, Check, RefreshCw, Trash2, Loader2
+  X, Eye, EyeOff, GripVertical, Check, RefreshCw, Trash2, Loader2, Keyboard
 } from "lucide-react"
 import { PROVIDER_REGISTRY, DEFAULT_PROVIDER_ORDER } from "../../providers/registry"
 import type { ProviderState } from "../../providers/useProviderManager"
+import { ProviderLogo } from "../shared/ProviderLogo"
 
-// ── Provider Colors ────────────────────────────────────────────────────────────
-const PROVIDER_COLORS: Record<string, string> = {
-  gemini: "bg-blue-500",
-  groq: "bg-orange-500",
-  github: "bg-gray-500",
-  openrouter: "bg-purple-500",
-  cerebras: "bg-green-500",
-  mistral: "bg-red-500",
-  cohere: "bg-rose-400",
-  cloudflare: "bg-amber-500"
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Tab = "apikeys" | "models" | "priority" | "preferences"
+type Tab = "apikeys" | "models" | "priority" | "preferences" | "shortcuts"
+
+// ── Default Shortcuts ─────────────────────────────────────────────────────────
+export const DEFAULT_SHORTCUTS: Record<string, string> = {
+  takeScreenshot: "CommandOrControl+H",
+  processScreenshots: "CommandOrControl+Enter",
+  toggleVisibility: "CommandOrControl+B",
+  resetSession: "CommandOrControl+R",
+  moveLeft: "CommandOrControl+Left",
+  moveRight: "CommandOrControl+Right",
+  moveUp: "CommandOrControl+Up",
+  moveDown: "CommandOrControl+Down",
+  decreaseOpacity: "CommandOrControl+[",
+  increaseOpacity: "CommandOrControl+]",
+  zoomOut: "CommandOrControl+-",
+  zoomIn: "CommandOrControl+=",
+  resetZoom: "CommandOrControl+0",
+  deleteLastScreenshot: "CommandOrControl+L",
+  toggleVoice: "CommandOrControl+Shift+V",
+  toggleMode: "CommandOrControl+Shift+G",
+  toggleChat: "CommandOrControl+Shift+C",
+  quitApp: "CommandOrControl+Q"
+}
+
+const SHORTCUT_LABELS: Record<string, string> = {
+  takeScreenshot: "Take Screenshot",
+  processScreenshots: "Process / Analyze",
+  toggleVisibility: "Toggle Visibility",
+  resetSession: "Reset Session",
+  moveLeft: "Move Window Left",
+  moveRight: "Move Window Right",
+  moveUp: "Move Window Up",
+  moveDown: "Move Window Down",
+  decreaseOpacity: "Decrease Opacity",
+  increaseOpacity: "Increase Opacity",
+  zoomOut: "Zoom Out",
+  zoomIn: "Zoom In",
+  resetZoom: "Reset Zoom",
+  deleteLastScreenshot: "Delete Last Screenshot",
+  toggleVoice: "Toggle Voice Input",
+  toggleMode: "Toggle Mode (General/Coding)",
+  toggleChat: "Toggle Chat",
+  quitApp: "Quit App"
+}
 type KeyStatus = "none" | "saved" | "working" | "failed"
 
 interface ProviderKeyState {
@@ -68,7 +101,6 @@ function SortableProviderRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const adapter = PROVIDER_REGISTRY[providerId]
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
-  const colorClass = PROVIDER_COLORS[providerId] ?? "bg-slate-500"
 
   return (
     <div
@@ -79,7 +111,7 @@ function SortableProviderRow({
       <button {...attributes} {...listeners} className="text-white/30 hover:text-white/60 cursor-grab active:cursor-grabbing flex-shrink-0">
         <GripVertical className="w-4 h-4" />
       </button>
-      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${colorClass}`} />
+      <ProviderLogo providerId={providerId} size={16} />
       <span className="text-white/80 text-sm flex-1 font-medium">{adapter?.config.name ?? providerId}</span>
       {isFree && <span className="text-xs text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">FREE</span>}
       <span className={`w-2 h-2 rounded-full ${keySaved ? "bg-green-400" : "bg-white/20"}`} title={keySaved ? "Key saved" : "No key"} />
@@ -108,6 +140,11 @@ export function SettingsDialog({ open: externalOpen, onOpenChange, providerState
   const [answerLanguage, setAnswerLanguage] = useState("auto")
   const [showProviderUsed, setShowProviderUsed] = useState(true)
   const [autoAnalyze, setAutoAnalyze] = useState(false)
+
+  // Shortcuts state
+  const [shortcuts, setShortcuts] = useState<Record<string, string>>({ ...DEFAULT_SHORTCUTS })
+  const [editingShortcut, setEditingShortcut] = useState<string | null>(null)
+  const [recordedKeys, setRecordedKeys] = useState<string>("") 
 
   // Saved indicator
   const [savedField, setSavedField] = useState<string | null>(null)
@@ -155,6 +192,10 @@ export function SettingsDialog({ open: externalOpen, onOpenChange, providerState
         setAnswerLanguage((store?.answerLanguage as string) ?? "auto")
         setShowProviderUsed((store?.showProviderUsed as boolean) ?? true)
         setAutoAnalyze((store?.autoAnalyzeOnScreenshot as boolean) ?? false)
+
+        // Load shortcuts
+        const savedShortcuts = (store?.customShortcuts as Record<string, string>) ?? {}
+        setShortcuts({ ...DEFAULT_SHORTCUTS, ...savedShortcuts })
 
         // Load cloudflare account ID
         const cfAccountId = (store?.cloudflareAccountId as string) ?? ""
@@ -270,7 +311,8 @@ export function SettingsDialog({ open: externalOpen, onOpenChange, providerState
     { id: "apikeys", label: "API Keys" },
     { id: "models", label: "Models" },
     { id: "priority", label: "Priority Order" },
-    { id: "preferences", label: "Preferences" }
+    { id: "preferences", label: "Preferences" },
+    { id: "shortcuts", label: "Shortcuts" }
   ]
 
   return (
@@ -322,7 +364,6 @@ export function SettingsDialog({ open: externalOpen, onOpenChange, providerState
               {DEFAULT_PROVIDER_ORDER.map(id => {
                 const adapter = PROVIDER_REGISTRY[id]
                 const ks = keyStates[id] ?? { apiKey: "", accountId: "", showKey: false, keyStatus: "none", testing: false, testError: "" }
-                const colorClass = PROVIDER_COLORS[id] ?? "bg-slate-500"
                 const statusDot = { none: "bg-white/20", saved: "bg-yellow-400", working: "bg-green-400", failed: "bg-red-400" }[ks.keyStatus]
                 const statusLabel = { none: "No key saved", saved: "Key saved — not tested", working: "Tested and working", failed: "Test failed" }[ks.keyStatus]
 
@@ -331,7 +372,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange, providerState
                     {/* Provider header */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex-shrink-0 ${colorClass}`} />
+                        <ProviderLogo providerId={id} size={32} />
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-white font-medium text-sm">{adapter.config.name}</span>
@@ -444,13 +485,12 @@ export function SettingsDialog({ open: externalOpen, onOpenChange, providerState
                 const adapter = PROVIDER_REGISTRY[id]
                 const ks = keyStates[id]
                 const hasKey = ks && ks.keyStatus !== "none"
-                const colorClass = PROVIDER_COLORS[id] ?? "bg-slate-500"
                 const currentModel = modelPrefs[id] ?? adapter.config.defaultModel
 
                 return (
                   <div key={id} className={`border rounded-xl p-4 ${hasKey ? "border-white/10 bg-white/[0.02]" : "border-white/5 bg-black/20 opacity-50"}`}>
                     <div className="flex items-center gap-2 mb-3">
-                      <div className={`w-5 h-5 rounded-full flex-shrink-0 ${colorClass}`} />
+                      <ProviderLogo providerId={id} size={20} />
                       <span className={`text-sm font-medium ${hasKey ? "text-white" : "text-white/40"}`}>{adapter.config.name}</span>
                       {!hasKey && <span className="text-xs text-white/30 ml-1">— Add API key first</span>}
                     </div>
@@ -679,28 +719,153 @@ export function SettingsDialog({ open: externalOpen, onOpenChange, providerState
               <div>
                 <label className="text-white text-sm font-medium block mb-2">Keyboard Shortcuts</label>
                 <div className="rounded-lg bg-white/5 border border-white/10 p-3">
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                    {[
-                      ["Capture & analyze screen", "Ctrl+Enter / Cmd+Enter"],
-                      ["Toggle visibility", "Ctrl+B / Cmd+B"],
-                      ["Take screenshot", "Ctrl+H / Cmd+H"],
-                      ["Toggle voice input", "Ctrl+Shift+V / Cmd+Shift+V"],
-                      ["Toggle mode (General/Coding)", "Ctrl+Shift+G / Cmd+Shift+G"],
-                      ["Move window", "Ctrl+Arrow Keys"],
-                      ["Delete last screenshot", "Ctrl+L / Cmd+L"],
-                      ["Reset / new session", "Ctrl+R / Cmd+R"],
-                      ["Decrease opacity", "Ctrl+[ / Cmd+["],
-                      ["Increase opacity", "Ctrl+] / Cmd+]"],
-                      ["Quit app", "Ctrl+Q / Cmd+Q"]
-                    ].map(([action, keys]) => (
-                      <React.Fragment key={action}>
-                        <span className="text-white/60">{action}</span>
-                        <span className="text-white/90 font-mono">{keys}</span>
+                  <p className="text-white/50 text-xs mb-2">You can customize shortcuts in the <button onClick={() => setActiveTab("shortcuts")} className="text-blue-400 hover:underline">Shortcuts tab</button>.</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs max-h-[200px] overflow-y-auto pr-1">
+                    {Object.entries(SHORTCUT_LABELS).map(([key, label]) => (
+                      <React.Fragment key={key}>
+                        <span className="text-white/60">{label}</span>
+                        <span className={`font-mono text-xs ${(shortcuts[key] ?? DEFAULT_SHORTCUTS[key]) !== DEFAULT_SHORTCUTS[key] ? "text-amber-300" : "text-white/90"}`}>
+                          {(shortcuts[key] ?? DEFAULT_SHORTCUTS[key]).replace(/CommandOrControl/g, "Ctrl")}
+                        </span>
                       </React.Fragment>
                     ))}
                   </div>
-                  <p className="text-white/30 text-xs mt-3">Hotkey customization requires editing the source code and restarting the app.</p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Shortcuts Tab ────────────────────────────────────────── */}
+          {activeTab === "shortcuts" && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-3 text-sm text-white/70">
+                <p>Click on any shortcut to change it. Press the new key combination, then click <strong>Save</strong>. Changes take effect after restarting the app.</p>
+              </div>
+
+              <div className="space-y-2">
+                {Object.entries(SHORTCUT_LABELS).map(([key, label]) => {
+                  const currentShortcut = shortcuts[key] ?? DEFAULT_SHORTCUTS[key]
+                  const displayShortcut = currentShortcut
+                    .replace(/CommandOrControl/g, "Ctrl")
+                    .replace(/\+/g, " + ")
+                  const isEditing = editingShortcut === key
+                  const isDefault = currentShortcut === DEFAULT_SHORTCUTS[key]
+
+                  return (
+                    <div
+                      key={key}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2.5 border transition-colors ${
+                        isEditing
+                          ? "border-blue-500/40 bg-blue-500/10"
+                          : "border-white/10 bg-white/[0.02] hover:bg-white/5"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Keyboard className="w-4 h-4 text-white/30 flex-shrink-0" />
+                        <span className="text-white/80 text-sm font-medium">{label}</span>
+                        {!isDefault && (
+                          <span className="text-xs text-amber-400/60 border border-amber-500/20 px-1.5 py-0.5 rounded flex-shrink-0">
+                            Custom
+                          </span>
+                        )}
+                      </div>
+
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            autoFocus
+                            readOnly
+                            value={recordedKeys || "Press keys…"}
+                            onKeyDown={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              const parts: string[] = []
+                              if (e.ctrlKey || e.metaKey) parts.push("CommandOrControl")
+                              if (e.shiftKey) parts.push("Shift")
+                              if (e.altKey) parts.push("Alt")
+                              const keyName = e.key
+                              if (!["Control", "Shift", "Alt", "Meta"].includes(keyName)) {
+                                // Normalize key names for Electron
+                                let normalized = keyName
+                                if (keyName === "ArrowLeft") normalized = "Left"
+                                else if (keyName === "ArrowRight") normalized = "Right"
+                                else if (keyName === "ArrowUp") normalized = "Up"
+                                else if (keyName === "ArrowDown") normalized = "Down"
+                                else if (keyName === " ") normalized = "Space"
+                                else if (keyName.length === 1) normalized = keyName.toUpperCase()
+                                parts.push(normalized)
+                              }
+                              if (parts.length > 0) {
+                                setRecordedKeys(parts.join("+"))
+                              }
+                            }}
+                            className="bg-white/5 border border-white/20 rounded-lg px-3 py-1.5 text-white text-xs font-mono w-[180px] outline-none focus:border-blue-500/50 text-center"
+                          />
+                          <button
+                            onClick={() => {
+                              if (recordedKeys) {
+                                const newShortcuts = { ...shortcuts, [key]: recordedKeys }
+                                setShortcuts(newShortcuts)
+                                // Save only the ones that differ from default
+                                const customOnly: Record<string, string> = {}
+                                for (const [k, v] of Object.entries(newShortcuts)) {
+                                  if (v !== DEFAULT_SHORTCUTS[k]) {
+                                    customOnly[k] = v
+                                  }
+                                }
+                                window.electronAPI.setStoreValue("customShortcuts", customOnly)
+                                showToast("Shortcut saved — restart app to apply")
+                              }
+                              setEditingShortcut(null)
+                              setRecordedKeys("")
+                            }}
+                            disabled={!recordedKeys}
+                            className="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingShortcut(null)
+                              setRecordedKeys("")
+                            }}
+                            className="text-white/40 hover:text-white/70 text-xs"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingShortcut(key)
+                            setRecordedKeys("")
+                          }}
+                          className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white/80 text-xs font-mono hover:bg-white/10 transition-colors min-w-[150px] text-center"
+                        >
+                          {displayShortcut}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Reset to Defaults */}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setShortcuts({ ...DEFAULT_SHORTCUTS })
+                    window.electronAPI.setStoreValue("customShortcuts", {})
+                    showToast("Shortcuts reset to defaults — restart app to apply")
+                  }}
+                  className="flex-1 py-2 border border-white/10 rounded-lg text-white/60 text-sm hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Reset All to Defaults
+                </button>
+              </div>
+
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-xs text-amber-200/70">
+                <strong>Note:</strong> After changing shortcuts, restart the app for changes to take effect. Shortcuts use Electron accelerators (<code className="bg-black/30 px-1 rounded">CommandOrControl</code> maps to Ctrl on Windows/Linux and Cmd on Mac).
               </div>
             </div>
           )}

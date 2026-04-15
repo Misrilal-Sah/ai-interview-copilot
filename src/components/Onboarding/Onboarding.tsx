@@ -1,57 +1,38 @@
-// src/components/Onboarding/Onboarding.tsx — 5-step first-launch onboarding
-import { useState } from "react"
-import { Camera, Mic, Zap, Star, ArrowRight, Check, Loader2, Eye, EyeOff } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Camera, Mic, Zap, Star, ArrowRight, Check, Loader2, Eye, EyeOff, MessageCircle, AlertCircle } from "lucide-react"
+import { PROVIDER_REGISTRY, DEFAULT_PROVIDER_ORDER } from "../../providers/registry"
+import { ProviderLogo } from "../shared/ProviderLogo"
 
 interface OnboardingProps {
   onComplete: () => void
 }
 
-const FREE_PROVIDERS = [
-  {
-    id: "gemini",
-    name: "Google AI Studio",
-    color: "bg-blue-500",
-    description: "1500 free requests/day. Best vision.",
-    url: "https://aistudio.google.com/",
-    placeholder: "AIza..."
-  },
-  {
-    id: "github",
-    name: "GitHub Models",
-    color: "bg-gray-600",
-    description: "GPT-4o, Grok, DeepSeek. Free with GitHub account.",
-    url: "https://github.com/marketplace/models",
-    placeholder: "ghp_... or github_pat_..."
-  },
-  {
-    id: "groq",
-    name: "Groq",
-    color: "bg-orange-500",
-    description: "Ultra-fast LLaMA models. Generous free tier.",
-    url: "https://console.groq.com/",
-    placeholder: "gsk_..."
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    color: "bg-purple-500",
-    description: "50+ free model options in one key.",
-    url: "https://openrouter.ai/",
-    placeholder: "sk-or-..."
-  }
-]
 
-type ProviderKeyState = { key: string; showKey: boolean; status: "none" | "saved" | "saving" }
+type ProviderKeyState = {
+  key: string
+  accountId: string
+  showKey: boolean
+  status: "none" | "saved" | "saving" | "testing" | "tested" | "test-failed"
+  testError: string
+}
 
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState(0)
   const [keyStates, setKeyStates] = useState<Record<string, ProviderKeyState>>(
-    Object.fromEntries(FREE_PROVIDERS.map(p => [p.id, { key: "", showKey: false, status: "none" }]))
+    Object.fromEntries(DEFAULT_PROVIDER_ORDER.map(id => [id, { key: "", accountId: "", showKey: false, status: "none", testError: "" }]))
   )
   const [appMode, setAppMode] = useState<"general" | "coding">("general")
+  const [shortcuts, setShortcuts] = useState<Record<string, string>>({})
 
   const totalSteps = 5
-  const savedCount = Object.values(keyStates).filter(k => k.status === "saved").length
+  const savedCount = Object.values(keyStates).filter(k => k.status === "saved" || k.status === "tested").length
+
+  // Load custom shortcuts for cheat sheet display
+  useEffect(() => {
+    window.electronAPI.getStoreValue("customShortcuts").then((custom: any) => {
+      setShortcuts(custom ?? {})
+    }).catch(() => {})
+  }, [])
 
   const updateKey = (id: string, patch: Partial<ProviderKeyState>) => {
     setKeyStates(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }))
@@ -60,21 +41,55 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const handleSaveKey = async (id: string) => {
     const ks = keyStates[id]
     if (!ks.key.trim()) return
-    updateKey(id, { status: "saving" })
+    updateKey(id, { status: "saving", testError: "" })
     try {
+      // Save account ID for Cloudflare
+      if (id === "cloudflare" && ks.accountId.trim()) {
+        await window.electronAPI.setStoreValue("cloudflareAccountId", ks.accountId.trim())
+      }
       const ok = await window.electronAPI.saveKey(id, ks.key.trim())
-      updateKey(id, { status: ok ? "saved" : "none", key: "" })
+      updateKey(id, { status: ok ? "saved" : "none" })
     } catch {
-      updateKey(id, { status: "none" })
+      updateKey(id, { status: "none", testError: "Failed to save key" })
+    }
+  }
+
+  const handleTestKey = async (id: string) => {
+    const ks = keyStates[id]
+    if (ks.status !== "saved" && ks.status !== "tested" && ks.status !== "test-failed") return
+    updateKey(id, { status: "testing", testError: "" })
+    try {
+      const adapter = PROVIDER_REGISTRY[id]
+      const savedKey = await window.electronAPI.getKey(id)
+      if (!savedKey) {
+        updateKey(id, { status: "test-failed", testError: "No key found" })
+        return
+      }
+      const accountId = id === "cloudflare"
+        ? ((await window.electronAPI.getStoreValue("cloudflareAccountId") as string) ?? "")
+        : undefined
+      const response = await adapter.call(savedKey, "Reply with just the word HELLO", null, adapter.config.defaultModel, "", accountId)
+      if (response.error) {
+        updateKey(id, { status: "test-failed", testError: response.error.slice(0, 80) })
+      } else {
+        updateKey(id, { status: "tested", testError: "" })
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      updateKey(id, { status: "test-failed", testError: msg.slice(0, 80) })
     }
   }
 
   const handleFinish = () => {
-    // Fire-and-forget the IPC store writes — don't block the close on network roundtrips
     window.electronAPI.setStoreValue("appMode", appMode).catch(() => {})
     window.electronAPI.setStoreValue("onboardingCompleted", true).catch(() => {})
-    // Close the onboarding immediately
     onComplete()
+  }
+
+  // Helper to get display shortcut
+  const getShortcut = (key: string, fallback: string): string => {
+    const val = shortcuts[key] ?? fallback
+    return val.replace(/CommandOrControl/g, "Ctrl").replace(/\+/g, "+")
   }
 
   return (
@@ -84,7 +99,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     >
       <div
         className="relative bg-gray-950 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
-        style={{ width: 560, maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+        style={{ width: 600, maxHeight: "90vh", display: "flex", flexDirection: "column" }}
       >
         {/* Progress bar */}
         <div className="h-0.5 bg-white/10 flex-shrink-0">
@@ -114,7 +129,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 {[
                   { icon: <Camera className="w-4 h-4" />, title: "Screenshot to Answer", description: "Capture anything, get instant AI answers" },
                   { icon: <Mic className="w-4 h-4" />, title: "Voice Input", description: "Ask questions with your voice" },
-                  { icon: <Star className="w-4 h-4" />, title: "8 AI Providers", description: "Multiple free providers with auto-fallback" }
+                  { icon: <MessageCircle className="w-4 h-4" />, title: "Chat Mode", description: "Type and chat like ChatGPT, invisible" }
                 ].map((feat, i) => (
                   <div key={i} className="bg-white/5 rounded-xl p-3 border border-white/10">
                     <div className="text-blue-400 mb-2">{feat.icon}</div>
@@ -132,52 +147,105 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </div>
           )}
 
-          {/* ── Step 1: Add First API Key ────────────────────────────── */}
+          {/* ── Step 1: Add API Keys (All 8 providers) ────────────── */}
           {step === 1 && (
             <div>
-              <h2 className="text-white text-xl font-bold mb-1">Add Your First Free API Key</h2>
-              <p className="text-white/60 text-sm mb-5">All four providers below have a free tier. You only need one to get started.</p>
+              <h2 className="text-white text-xl font-bold mb-1">Add Your API Keys</h2>
+              <p className="text-white/60 text-sm mb-5">All providers marked <span className="text-green-400">FREE</span> have a generous free tier. You only need <strong>one</strong> to get started.</p>
 
               <div className="space-y-3">
-                {FREE_PROVIDERS.map(provider => {
-                  const ks = keyStates[provider.id]
-                  const isSaved = ks.status === "saved"
+                {DEFAULT_PROVIDER_ORDER.map(id => {
+                  const adapter = PROVIDER_REGISTRY[id]
+                  const ks = keyStates[id]
+                  const isSaved = ks.status === "saved" || ks.status === "tested"
+                  const isTested = ks.status === "tested"
+                  const isFailed = ks.status === "test-failed"
+
                   return (
-                    <div key={provider.id} className={`border rounded-xl p-3 transition-all ${isSaved ? "border-green-500/40 bg-green-500/5" : "border-white/10 bg-white/[0.02]"}`}>
+                    <div key={id} className={`border rounded-xl p-3 transition-all ${
+                      isTested ? "border-green-500/40 bg-green-500/5" :
+                      isSaved ? "border-yellow-500/30 bg-yellow-500/5" :
+                      isFailed ? "border-red-500/30 bg-red-500/5" :
+                      "border-white/10 bg-white/[0.02]"
+                    }`}>
                       <div className="flex items-center gap-3 mb-2">
-                        <div className={`w-4 h-4 rounded-full flex-shrink-0 ${provider.color}`} />
-                        <span className="text-white font-medium text-sm">{provider.name}</span>
-                        {isSaved && <Check className="w-4 h-4 text-green-400 ml-auto" />}
+                        <ProviderLogo providerId={id} size={18} />
+                        <span className="text-white font-medium text-sm">{adapter.config.name}</span>
+                        {adapter.config.isFree && <span className="text-xs text-green-400 border border-green-500/30 px-1 rounded">FREE</span>}
+                        {!adapter.config.isFree && <span className="text-xs text-white/30 border border-white/10 px-1 rounded">PAID</span>}
+                        {isTested && <Check className="w-4 h-4 text-green-400 ml-auto" />}
+                        {isSaved && !isTested && <span className="text-xs text-yellow-400 ml-auto">Saved</span>}
                       </div>
-                      <p className="text-white/50 text-xs mb-2">{provider.description}</p>
-                      {!isSaved && (
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
+                      <p className="text-white/50 text-xs mb-2">{adapter.config.description}</p>
+
+                      {/* Error */}
+                      {ks.testError && (
+                        <div className="flex items-center gap-1.5 mb-2 text-red-400 text-xs">
+                          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>{ks.testError}</span>
+                        </div>
+                      )}
+
+                      {!isSaved && !isTested && (
+                        <div className="space-y-2">
+                          {/* Cloudflare needs account ID */}
+                          {id === "cloudflare" && (
                             <input
-                              type={ks.showKey ? "text" : "password"}
-                              value={ks.key}
-                              onChange={e => updateKey(provider.id, { key: e.target.value })}
-                              onKeyDown={e => e.key === "Enter" && handleSaveKey(provider.id)}
-                              placeholder={provider.placeholder}
-                              className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs pr-7 outline-none focus:border-white/30"
+                              type="text"
+                              value={ks.accountId}
+                              onChange={e => updateKey(id, { accountId: e.target.value })}
+                              placeholder="Cloudflare Account ID"
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs outline-none focus:border-white/30"
                             />
-                            <button onClick={() => updateKey(provider.id, { showKey: !ks.showKey })} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
-                              {ks.showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          )}
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type={ks.showKey ? "text" : "password"}
+                                value={ks.key}
+                                onChange={e => updateKey(id, { key: e.target.value })}
+                                onKeyDown={e => e.key === "Enter" && handleSaveKey(id)}
+                                placeholder={`Paste your ${adapter.config.name} key`}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs pr-7 outline-none focus:border-white/30"
+                              />
+                              <button onClick={() => updateKey(id, { showKey: !ks.showKey })} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+                                {ks.showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => handleSaveKey(id)}
+                              disabled={!ks.key.trim() || ks.status === "saving"}
+                              className="px-3 py-1.5 bg-white text-black text-xs font-medium rounded-lg hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 flex-shrink-0"
+                            >
+                              {ks.status === "saving" ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                              {ks.status === "saving" ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              onClick={() => window.electronAPI.openLink(adapter.config.signupUrl)}
+                              className="px-2 py-1.5 text-blue-400 text-xs border border-blue-500/20 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 flex-shrink-0"
+                            >
+                              Get key
                             </button>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Test button for saved keys */}
+                      {(isSaved || isFailed) && (
+                        <div className="flex items-center gap-2 mt-2">
                           <button
-                            onClick={() => handleSaveKey(provider.id)}
-                            disabled={!ks.key.trim() || ks.status === "saving"}
-                            className="px-3 py-1.5 bg-white text-black text-xs font-medium rounded-lg hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 flex-shrink-0"
+                            onClick={() => handleTestKey(id)}
+                            disabled={ks.status === "testing"}
+                            className="px-3 py-1.5 bg-white/10 text-white text-xs font-medium rounded-lg hover:bg-white/15 transition-colors disabled:opacity-40 flex items-center gap-1"
                           >
-                            {ks.status === "saving" ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                            {ks.status === "saving" ? "Saving…" : "Save"}
+                            {ks.status === "testing" ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                            {ks.status === "testing" ? "Testing…" : "Test Key"}
                           </button>
                           <button
-                            onClick={() => window.electronAPI.openLink(provider.url)}
-                            className="px-2 py-1.5 text-blue-400 text-xs border border-blue-500/20 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 flex-shrink-0"
+                            onClick={() => updateKey(id, { status: "none", key: "", testError: "" })}
+                            className="text-white/40 text-xs hover:text-white/70"
                           >
-                            Get key
+                            Change Key
                           </button>
                         </div>
                       )}
@@ -200,25 +268,41 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </div>
           )}
 
-          {/* ── Step 2: Test Connection ───────────────────────────────── */}
+          {/* ── Step 2: Summary ───────────────────────────────────── */}
           {step === 2 && (
             <div className="text-center">
               <div className="w-16 h-16 bg-green-500/20 border border-green-500/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <Check className="w-8 h-8 text-green-400" />
               </div>
-              <h2 className="text-white text-xl font-bold mb-2">You're Ready!</h2>
+              <h2 className="text-white text-xl font-bold mb-2">
+                {savedCount > 0 ? "You're Ready!" : "No Keys Added Yet"}
+              </h2>
               <p className="text-white/60 text-sm mb-4">
-                You've saved keys for {savedCount} provider{savedCount > 1 ? "s" : ""}. The app will automatically pick the best available provider and fall back if one hits a rate limit.
+                {savedCount > 0
+                  ? `You've saved keys for ${savedCount} provider${savedCount > 1 ? "s" : ""}. The app will auto-pick the best available provider and fall back if one hits a rate limit.`
+                  : "You can add API keys later from Settings. The app needs at least one key to function."
+                }
               </p>
-              <div className="bg-white/5 rounded-xl border border-white/10 p-4 text-left text-sm mb-6 space-y-2">
-                {FREE_PROVIDERS.filter(p => keyStates[p.id].status === "saved").map(p => (
-                  <div key={p.id} className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${p.color}`} />
-                    <span className="text-white/70">{p.name}</span>
-                    <span className="text-green-400 text-xs ml-auto">✓ Ready</span>
-                  </div>
-                ))}
-              </div>
+              {savedCount > 0 && (
+                <div className="bg-white/5 rounded-xl border border-white/10 p-4 text-left text-sm mb-6 space-y-2">
+                  {DEFAULT_PROVIDER_ORDER.filter(id => {
+                    const ks = keyStates[id]
+                    return ks.status === "saved" || ks.status === "tested"
+                  }).map(id => {
+                    const adapter = PROVIDER_REGISTRY[id]
+                    const ks = keyStates[id]
+                    return (
+                      <div key={id} className="flex items-center gap-2">
+                        <ProviderLogo providerId={id} size={14} />
+                        <span className="text-white/70">{adapter.config.name}</span>
+                        <span className={`text-xs ml-auto ${ks.status === "tested" ? "text-green-400" : "text-yellow-400"}`}>
+                          {ks.status === "tested" ? "✓ Tested" : "✓ Saved"}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="px-4 py-2 border border-white/10 rounded-lg text-white/60 text-sm hover:bg-white/5">
                   Back
@@ -230,11 +314,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </div>
           )}
 
-          {/* ── Step 3: Choose Mode ───────────────────────────────────── */}
+          {/* ── Step 3: Choose Mode ───────────────────────────────── */}
           {step === 3 && (
             <div>
               <h2 className="text-white text-xl font-bold mb-2">Choose Your Default Mode</h2>
-              <p className="text-white/60 text-sm mb-5">You can change this anytime with Ctrl+Shift+G or in Settings.</p>
+              <p className="text-white/60 text-sm mb-5">You can change this anytime with {getShortcut("toggleMode", "CommandOrControl+Shift+G")} or in Settings.</p>
               <div className="grid grid-cols-2 gap-4 mb-6">
                 {([
                   {
@@ -277,22 +361,23 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </div>
           )}
 
-          {/* ── Step 4: Hotkey Cheat Sheet ────────────────────────────── */}
+          {/* ── Step 4: Hotkey Cheat Sheet (with custom shortcuts + new Chat) ── */}
           {step === 4 && (
             <div>
               <h2 className="text-white text-xl font-bold mb-2">Hotkey Cheat Sheet</h2>
-              <p className="text-white/60 text-sm mb-4">The app runs invisibly. You control everything with hotkeys.</p>
+              <p className="text-white/60 text-sm mb-4">The app runs invisibly. You control everything with hotkeys. Customize them anytime in Settings → Shortcuts.</p>
               <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden mb-5">
                 {[
-                  ["Ctrl+H / Cmd+H", "Take a screenshot", "primary"],
-                  ["Ctrl+Enter / Cmd+Enter", "Analyze screenshot", "primary"],
-                  ["Ctrl+Shift+V / Cmd+Shift+V", "Voice input", "secondary"],
-                  ["Ctrl+Shift+G / Cmd+Shift+G", "Toggle General/Coding mode", "secondary"],
-                  ["Ctrl+B / Cmd+B", "Show / Hide the overlay", "info"],
-                  ["Ctrl+R / Cmd+R", "Clear and start over", "info"],
-                  ["Ctrl+L / Cmd+L", "Delete last screenshot", "info"],
-                  ["Ctrl+[ / Ctrl+]", "Decrease / Increase opacity", "info"],
-                  ["Ctrl+Q / Cmd+Q", "Quit app", "info"]
+                  [getShortcut("takeScreenshot", "CommandOrControl+H"), "Take a screenshot", "primary"],
+                  [getShortcut("processScreenshots", "CommandOrControl+Enter"), "Analyze screenshot", "primary"],
+                  [getShortcut("toggleVoice", "CommandOrControl+Shift+V"), "Voice input", "secondary"],
+                  [getShortcut("toggleChat", "CommandOrControl+Shift+C"), "Chat mode (type questions)", "secondary"],
+                  [getShortcut("toggleMode", "CommandOrControl+Shift+G"), "Toggle General/Coding mode", "secondary"],
+                  [getShortcut("toggleVisibility", "CommandOrControl+B"), "Show / Hide the overlay", "info"],
+                  [getShortcut("resetSession", "CommandOrControl+R"), "Clear and start over", "info"],
+                  [getShortcut("deleteLastScreenshot", "CommandOrControl+L"), "Delete last screenshot", "info"],
+                  [`${getShortcut("decreaseOpacity", "CommandOrControl+[")} / ${getShortcut("increaseOpacity", "CommandOrControl+]")}`, "Decrease / Increase opacity", "info"],
+                  [getShortcut("quitApp", "CommandOrControl+Q"), "Quit app", "info"]
                 ].map(([keys, action, type], i) => (
                   <div key={i} className={`flex items-center gap-4 px-4 py-2.5 ${i % 2 === 0 ? "bg-white/[0.02]" : ""}`}>
                     <span className={`font-mono text-xs flex-shrink-0 px-2 py-0.5 rounded ${

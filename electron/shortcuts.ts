@@ -1,6 +1,29 @@
 import { globalShortcut, app } from "electron"
 import { IShortcutsHelperDeps } from "./main"
 import { configHelper } from "./ConfigHelper"
+import { appStore } from "./storage"
+
+// Default shortcut map — must match the DEFAULT_SHORTCUTS in SettingsDialog.tsx
+const DEFAULT_SHORTCUTS: Record<string, string> = {
+  takeScreenshot: "CommandOrControl+H",
+  processScreenshots: "CommandOrControl+Enter",
+  toggleVisibility: "CommandOrControl+B",
+  resetSession: "CommandOrControl+R",
+  moveLeft: "CommandOrControl+Left",
+  moveRight: "CommandOrControl+Right",
+  moveUp: "CommandOrControl+Up",
+  moveDown: "CommandOrControl+Down",
+  decreaseOpacity: "CommandOrControl+[",
+  increaseOpacity: "CommandOrControl+]",
+  zoomOut: "CommandOrControl+-",
+  zoomIn: "CommandOrControl+=",
+  resetZoom: "CommandOrControl+0",
+  deleteLastScreenshot: "CommandOrControl+L",
+  toggleVoice: "CommandOrControl+Shift+V",
+  toggleMode: "CommandOrControl+Shift+G",
+  toggleChat: "CommandOrControl+Shift+C",
+  quitApp: "CommandOrControl+Q"
+}
 
 export class ShortcutsHelper {
   private deps: IShortcutsHelperDeps
@@ -9,17 +32,36 @@ export class ShortcutsHelper {
     this.deps = deps
   }
 
+  /**
+   * Load custom shortcuts from store — merges with defaults so any
+   * uncustomized shortcuts still use the default accelerators.
+   */
+  private getShortcuts(): Record<string, string> {
+    try {
+      const custom = (appStore.get("customShortcuts") as Record<string, string>) ?? {}
+      const merged = { ...DEFAULT_SHORTCUTS, ...custom }
+      const customCount = Object.keys(custom).length
+      if (customCount > 0) {
+        console.log(`Loaded ${customCount} custom shortcut(s) from store:`, custom)
+      }
+      return merged
+    } catch (err) {
+      console.error("Failed to load custom shortcuts from store:", err)
+      return { ...DEFAULT_SHORTCUTS }
+    }
+  }
+
   private adjustOpacity(delta: number): void {
     const mainWindow = this.deps.getMainWindow();
     if (!mainWindow) return;
     
     let currentOpacity = mainWindow.getOpacity();
-    let newOpacity = Math.max(0.1, Math.min(1.0, currentOpacity + delta));
+    // Allow full range: 0 (invisible) to 1 (fully opaque)
+    let newOpacity = Math.max(0, Math.min(1.0, +(currentOpacity + delta).toFixed(2)));
     console.log(`Adjusting opacity from ${currentOpacity} to ${newOpacity}`);
     
     mainWindow.setOpacity(newOpacity);
     
-    // Save the opacity setting to config without re-initializing the client
     try {
       const config = configHelper.loadConfig();
       config.opacity = newOpacity;
@@ -28,14 +70,37 @@ export class ShortcutsHelper {
       console.error('Error saving opacity to config:', error);
     }
     
-    // If we're making the window visible, also make sure it's shown and interaction is enabled
-    if (newOpacity > 0.1 && !this.deps.isVisible()) {
+    // If opacity > 0 and window is currently hidden, show it
+    if (newOpacity > 0.05 && !this.deps.isVisible()) {
       this.deps.toggleMainWindow();
+    }
+    // If opacity hits 0, mark as hidden
+    if (newOpacity <= 0.05) {
+      mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    } else {
+      mainWindow.setIgnoreMouseEvents(false);
+    }
+  }
+
+  /**
+   * Safely register a shortcut — logs a warning if it fails
+   * (e.g. if the user set a conflicting or invalid accelerator)
+   */
+  private safeRegister(accelerator: string, action: string, handler: () => void): void {
+    try {
+      const ok = globalShortcut.register(accelerator, handler)
+      if (!ok) {
+        console.warn(`Failed to register shortcut "${accelerator}" for ${action} — may be in use by another app`)
+      }
+    } catch (err) {
+      console.error(`Error registering shortcut "${accelerator}" for ${action}:`, err)
     }
   }
 
   public registerGlobalShortcuts(): void {
-    globalShortcut.register("CommandOrControl+H", async () => {
+    const s = this.getShortcuts()
+
+    this.safeRegister(s.takeScreenshot, "takeScreenshot", async () => {
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
         console.log("Taking screenshot...")
@@ -52,27 +117,15 @@ export class ShortcutsHelper {
       }
     })
 
-    globalShortcut.register("CommandOrControl+Enter", async () => {
+    this.safeRegister(s.processScreenshots, "processScreenshots", async () => {
       await this.deps.processingHelper?.processScreenshots()
     })
 
-    globalShortcut.register("CommandOrControl+R", () => {
-      console.log(
-        "Command + R pressed. Canceling requests and resetting queues..."
-      )
-
-      // Cancel ongoing API requests
+    this.safeRegister(s.resetSession, "resetSession", () => {
+      console.log("Resetting — canceling requests and clearing queues...")
       this.deps.processingHelper?.cancelOngoingRequests()
-
-      // Clear both screenshot queues
       this.deps.clearQueues()
-
-      console.log("Cleared queues.")
-
-      // Update the view state to 'queue'
       this.deps.setView("queue")
-
-      // Notify renderer process to switch view to 'queue'
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("reset-view")
@@ -80,106 +133,86 @@ export class ShortcutsHelper {
       }
     })
 
-    // New shortcuts for moving the window
-    globalShortcut.register("CommandOrControl+Left", () => {
-      console.log("Command/Ctrl + Left pressed. Moving window left.")
+    this.safeRegister(s.moveLeft, "moveLeft", () => {
       this.deps.moveWindowLeft()
     })
 
-    globalShortcut.register("CommandOrControl+Right", () => {
-      console.log("Command/Ctrl + Right pressed. Moving window right.")
+    this.safeRegister(s.moveRight, "moveRight", () => {
       this.deps.moveWindowRight()
     })
 
-    globalShortcut.register("CommandOrControl+Down", () => {
-      console.log("Command/Ctrl + down pressed. Moving window down.")
+    this.safeRegister(s.moveDown, "moveDown", () => {
       this.deps.moveWindowDown()
     })
 
-    globalShortcut.register("CommandOrControl+Up", () => {
-      console.log("Command/Ctrl + Up pressed. Moving window Up.")
+    this.safeRegister(s.moveUp, "moveUp", () => {
       this.deps.moveWindowUp()
     })
 
-    globalShortcut.register("CommandOrControl+B", () => {
-      console.log("Command/Ctrl + B pressed. Toggling window visibility.")
+    this.safeRegister(s.toggleVisibility, "toggleVisibility", () => {
+      console.log("Toggling window visibility.")
       this.deps.toggleMainWindow()
     })
 
-    globalShortcut.register("CommandOrControl+Q", () => {
-      console.log("Command/Ctrl + Q pressed. Quitting application.")
+    this.safeRegister(s.quitApp, "quitApp", () => {
+      console.log("Quitting application.")
       app.quit()
     })
 
-    // Adjust opacity shortcuts
-    globalShortcut.register("CommandOrControl+[", () => {
-      console.log("Command/Ctrl + [ pressed. Decreasing opacity.")
+    this.safeRegister(s.decreaseOpacity, "decreaseOpacity", () => {
       this.adjustOpacity(-0.1)
     })
 
-    globalShortcut.register("CommandOrControl+]", () => {
-      console.log("Command/Ctrl + ] pressed. Increasing opacity.")
+    this.safeRegister(s.increaseOpacity, "increaseOpacity", () => {
       this.adjustOpacity(0.1)
     })
-    
-    // Zoom controls
-    globalShortcut.register("CommandOrControl+-", () => {
-      console.log("Command/Ctrl + - pressed. Zooming out.")
+
+    this.safeRegister(s.zoomOut, "zoomOut", () => {
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
         const currentZoom = mainWindow.webContents.getZoomLevel()
         mainWindow.webContents.setZoomLevel(currentZoom - 0.5)
       }
     })
-    
-    globalShortcut.register("CommandOrControl+0", () => {
-      console.log("Command/Ctrl + 0 pressed. Resetting zoom.")
+
+    this.safeRegister(s.resetZoom, "resetZoom", () => {
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
         mainWindow.webContents.setZoomLevel(0)
       }
     })
-    
-    globalShortcut.register("CommandOrControl+=", () => {
-      console.log("Command/Ctrl + = pressed. Zooming in.")
+
+    this.safeRegister(s.zoomIn, "zoomIn", () => {
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
         const currentZoom = mainWindow.webContents.getZoomLevel()
         mainWindow.webContents.setZoomLevel(currentZoom + 0.5)
       }
     })
-    
-    // Delete last screenshot shortcut
-    globalShortcut.register("CommandOrControl+L", () => {
-      console.log("Command/Ctrl + L pressed. Deleting last screenshot.")
+
+    this.safeRegister(s.deleteLastScreenshot, "deleteLastScreenshot", () => {
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow) {
-        // Send an event to the renderer to delete the last screenshot
         mainWindow.webContents.send("delete-last-screenshot")
       }
     })
 
-    // ── New hotkeys (Step 13) ────────────────────────────────────────────────
+    // ── Feature hotkeys ────────────────────────────────────────────────────
 
-    // Toggle voice input
-    globalShortcut.register("CommandOrControl+Shift+V", () => {
-      console.log("Command/Ctrl + Shift + V pressed. Toggling voice input.")
+    this.safeRegister(s.toggleVoice, "toggleVoice", () => {
+      console.log("Toggling voice input.")
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("toggle-voice")
       }
     })
 
-    // Toggle between General and Coding mode instantly
-    globalShortcut.register("CommandOrControl+Shift+G", () => {
-      console.log("Command/Ctrl + Shift + G pressed. Toggling app mode.")
+    this.safeRegister(s.toggleMode, "toggleMode", () => {
+      console.log("Toggling app mode.")
       try {
-        const { appStore } = require("./storage")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const store = appStore as any
-        const currentMode = store.get("appMode") as string
+        const currentMode = appStore.get("appMode") as string
         const newMode = currentMode === "coding" ? "general" : "coding"
-        store.set("appMode", newMode)
+        appStore.set("appMode", newMode)
         console.log(`App mode toggled to: ${newMode}`)
         const mainWindow = this.deps.getMainWindow()
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -187,6 +220,14 @@ export class ShortcutsHelper {
         }
       } catch (err) {
         console.error("Failed to toggle app mode:", err)
+      }
+    })
+
+    this.safeRegister(s.toggleChat, "toggleChat", () => {
+      console.log("Toggling chat input.")
+      const mainWindow = this.deps.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("toggle-chat")
       }
     })
 

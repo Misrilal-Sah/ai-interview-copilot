@@ -215,8 +215,6 @@ const electronAPI = {
     }
   },
   checkApiKey: () => ipcRenderer.invoke("check-api-key"),
-  validateApiKey: (apiKey: string) => 
-    ipcRenderer.invoke("validate-api-key", apiKey),
   openExternal: (url: string) => 
     ipcRenderer.invoke("openExternal", url),
   onApiKeyInvalid: (callback: () => void) => {
@@ -282,9 +280,22 @@ const electronAPI = {
   transcribeAudio: (base64Audio: string, mimeType: string) =>
     ipcRenderer.invoke("transcribe-audio", base64Audio, mimeType),
 
+  // ── Chat (text chatbot) ────────────────────────────────────────────────────
+  processChatQuestion: (message: string, history: Array<{ role: "user" | "assistant"; content: string }>) =>
+    ipcRenderer.invoke("process-chat-question", message, history),
+  onChatToggle: (callback: () => void) => {
+    const subscription = () => callback()
+    ipcRenderer.on("toggle-chat", subscription)
+    return () => ipcRenderer.removeListener("toggle-chat", subscription)
+  },
+
   // ── Window opacity control ──────────────────────────────────────────────────
   setWindowOpacity: (opacity: number) =>
-    ipcRenderer.invoke("set-window-opacity", opacity)
+    ipcRenderer.invoke("set-window-opacity", opacity),
+
+  // ── Native clipboard write (no DOM manipulation = no flicker) ───────────
+  writeClipboard: (text: string) =>
+    ipcRenderer.invoke("write-clipboard", text)
 }
 
 // Before exposing the API

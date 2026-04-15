@@ -92,3 +92,38 @@ export function buildDebugPrompt(
 
 Format your response in Markdown with code blocks.${langSuffix(answerLanguage)}`
 }
+
+/**
+ * Chat mode — multi-turn conversational AI with history context.
+ */
+export interface ChatMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
+export function buildChatPrompt(
+  message: string,
+  history: ChatMessage[],
+  customContext: string,
+  answerLanguage: string
+): string {
+  // Build conversation history context
+  let historyContext = ""
+  if (history.length > 0) {
+    const recentHistory = history.slice(-10) // Keep last 10 messages for context
+    historyContext = "\n\nConversation history:\n" +
+      recentHistory.map(m => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n") +
+      "\n\n"
+  }
+
+  return `${contextPrefix(customContext)}You are an expert AI assistant engaged in a conversation. Answer the user's question helpfully, accurately, and concisely.${historyContext}User: ${message}
+
+Guidelines:
+- If this is a technical/coding question, provide accurate code with explanations.
+- If this is a behavioral/interview question, use the STAR method.
+- If this is a general question, answer directly and clearly.
+- Maintain context from the conversation history above.
+- Keep responses focused and relevant.
+
+Format your response in Markdown.${langSuffix(answerLanguage)}`
+}

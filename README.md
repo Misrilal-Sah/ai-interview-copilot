@@ -1,7 +1,7 @@
 <div align="center">
 
 <!-- Animated banner -->
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:1a1a2e,50:16213e,100:0f3460&height=200&section=header&text=AI%20Interview%20Copilot&fontSize=52&fontColor=ffffff&fontAlignY=38&desc=Your%20invisible%20AI%20overlay%20for%20any%20screen&descAlignY=58&descSize=18&descColor=a0aec0&animation=fadeIn" width="100%" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:1a1a2e,50:16213e,100:0f3460&height=200&section=header&text=AI%20Screen%20Assistant&fontSize=52&fontColor=ffffff&fontAlignY=38&desc=Your%20invisible%20AI%20overlay%20for%20any%20screen&descAlignY=58&descSize=18&descColor=a0aec0&animation=fadeIn" width="100%" />
 
 <br/>
 
@@ -19,13 +19,15 @@
 <br/><br/>
 
 <!-- Feature pills -->
-<img src="https://img.shields.io/badge/🔮%208%20Free%20AI%20Providers-auto--fallback-6c5ce7?style=flat-square&labelColor=1a1a2e"/>
+<img src="https://img.shields.io/badge/🔮%208%20AI%20Providers-SVG%20Logos%20%2B%20Fallback-6c5ce7?style=flat-square&labelColor=1a1a2e"/>
 &nbsp;
 <img src="https://img.shields.io/badge/📸%20Screenshot%20%2B%20Analyze-instant-00cec9?style=flat-square&labelColor=1a1a2e"/>
 &nbsp;
 <img src="https://img.shields.io/badge/🎤%20Voice%20Input-Whisper%20API-fd79a8?style=flat-square&labelColor=1a1a2e"/>
 &nbsp;
 <img src="https://img.shields.io/badge/👻%20Invisible%20Overlay-stealth-fdcb6e?style=flat-square&labelColor=1a1a2e"/>
+&nbsp;
+<img src="https://img.shields.io/badge/⚙️%20Custom%20Shortcuts-fully%20remappable-55efc4?style=flat-square&labelColor=1a1a2e"/>
 
 </div>
 
@@ -33,7 +35,7 @@
 
 ## 🚀 What Is This?
 
-**AI Interview Copilot** is a free, open-source **invisible desktop overlay** powered by multiple AI providers. It sits on top of any application — silently — and can read your screen, hear your voice, and answer anything in real time.
+**AI Screen Assistant** is a free, open-source **invisible desktop overlay** powered by 8 AI providers. It sits on top of any application — silently — and can read your screen, hear your voice, and answer anything in real time.
 
 > Whether you're solving coding problems, answering behavioral questions, reviewing documents, or studying MCQs — this tool has you covered.
 
@@ -43,6 +45,7 @@
 ┌──────────────────────────────────────────────────────────────┐
 │  📸  Take a screenshot  →  🤖  AI analyzes it  →  💡 Answer  │
 │  🎤  Speak a question   →  🔊  AI transcribes  →  💡 Answer  │
+│  💬  Type a message     →  🧠  AI chat reply   →  💡 Answer  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -56,9 +59,10 @@
 <tr>
 <td width="50%">
 
-### 🤖 Multi-Provider AI
-- **8 free AI providers** with automatic fallback
-- Gemini · OpenAI · Groq · Mistral · GitHub AI · Cohere · OpenRouter · Ollama
+### 🤖 Multi-Provider AI with SVG Logos
+- **8 AI providers** with automatic fallback
+- Gemini · Groq · Mistral · GitHub · Cohere · OpenRouter · Cerebras · Cloudflare
+- Each provider has a **branded SVG icon** in the UI
 - Auto-selects the best available provider
 - Falls back silently when rate-limited
 
@@ -76,10 +80,35 @@
 <tr>
 <td width="50%">
 
+### 🎛️ Smart Provider & Model Selector
+- Custom **dropdown UI** in the top bar (no native selects)
+- **Provider-specific model list** — switching provider shows only that provider's models
+- **Model capability badges** shown inline:
+  - 👁 **Vision** — can accept screenshot/image input
+  - ⚡ **Fast** — optimised for low-latency inference
+  - 🧠 **Reasoning** — extended chain-of-thought
+- Selecting a provider **promotes it to top priority** — your choice actually gets used for the next analysis
+
+</td>
+<td width="50%">
+
+### ⌨️ Fully Remappable Shortcuts
+- All shortcuts configurable in **Settings → Shortcuts**
+- Changes reflect **immediately** everywhere:
+  - Bottom action bar (screenshot, solve badges)
+  - Settings gear ⚙ tooltip
+  - Onboarding hotkey cheat sheet
+- Shortcuts parsed and displayed as **keyboard badge pills**
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
 ### 📸 Smart Screenshot Analysis
 - Capture any portion of your screen
 - AI reads code, text, MCQs, diagrams
-- Queue up to 2 screenshots at once
+- Queue up to 5 screenshots at once
 - Works with any application or browser
 
 </td>
@@ -87,9 +116,9 @@
 
 ### 🎤 Voice Input
 - Click mic → speak → get an AI answer
-- Powered by Whisper (Groq / OpenAI)
-- Live recording timer + auto-stop at 30s
-- No SpeechRecognition API limitations
+- Powered by Groq Whisper (ultra-fast)
+- Live recording timer + auto-stop at 30 s
+- Answers logged in the **History panel**
 
 </td>
 </tr>
@@ -98,17 +127,17 @@
 
 ### 💻 Two Processing Modes
 - **General Mode** — MCQs, essays, behavioral, any content
-- **Coding Mode** — 3-stage pipeline: extract → solve → debug
-- Toggle anytime with `Ctrl+Shift+G`
+- **Coding Mode** — structured solve + debug pipeline
+- Toggle anytime with `Ctrl+Shift+G` or click the badge
 
 </td>
 <td width="50%">
 
-### 🎯 Answer History
-- All answers saved in-session
-- Quick access to past responses
-- Copy to clipboard with one click
-- Provider + model metadata shown
+### 💬 Chat Mode
+- Full multi-turn conversation panel
+- Invisible to screen capture
+- Toggle with `Ctrl+Shift+C`
+- Chat history saved in-session
 
 </td>
 </tr>
@@ -116,20 +145,20 @@
 
 ---
 
-## 🔑 Supported AI Providers (All Free Tier Available)
+## 🔑 Supported AI Providers
 
-| Provider | Models | Voice Transcription | Get Key |
-|----------|--------|-------------------|---------|
-| **Groq** ⭐ Recommended | Llama 3.3, Mixtral | ✅ Whisper (ultra-fast) | [console.groq.com](https://console.groq.com) |
-| **Google Gemini** | Gemini 2.0 Flash | ❌ | [aistudio.google.com](https://aistudio.google.com) |
-| **OpenAI** | GPT-4o, GPT-4o-mini | ✅ Whisper-1 | [platform.openai.com](https://platform.openai.com) |
-| **Mistral** | Mistral Small/Large | ❌ | [console.mistral.ai](https://console.mistral.ai) |
-| **OpenRouter** | 50+ models | ✅ Whisper | [openrouter.ai](https://openrouter.ai) |
-| **GitHub AI** | GPT-4o, Llama | ❌ | [github.com/marketplace](https://github.com/marketplace/models) |
-| **Cohere** | Command R+ | ❌ | [dashboard.cohere.com](https://dashboard.cohere.com) |
-| **Ollama** | Any local model | ❌ | Local (no key needed) |
+| Provider | SVG Logo Color | Vision | Speed | Free Tier | Models |
+|----------|---------------|--------|-------|-----------|--------|
+| **Google Gemini** ⭐ | Blue–Violet sparkle | ✅ | Fast | ✅ | Flash 2.0, Pro 1.5, 2.5 |
+| **Groq** | Coral lightning bolt | ❌ | Ultra-fast | ✅ | Llama 3.3, Mixtral, Gemma |
+| **GitHub Models** | GitHub cat | ✅ (GPT-4o) | Fast | ✅ | GPT-4o, Grok-3, DeepSeek |
+| **Mistral** | Orange block grid | ✅ (Pixtral) | Medium | ❌ | Small, Large, Pixtral |
+| **OpenRouter** | Indigo routing nodes | ❌ | Var. | ✅ | Custom model string |
+| **Cerebras** | Cyan chip wafer | ❌ | Ultra-fast | ✅ | Llama 3.3, Llama 4 Scout |
+| **Cohere** | Rose arc | ❌ | Medium | ❌ | Command R, R+ |
+| **Cloudflare Workers AI** | Orange cloud | ✅ (Llama Vision) | Fast | ✅ | Llama 3.3, Gemma, DeepSeek |
 
-> 💡 **You only need ONE key to get started.** The app auto-falls back to the next available provider if one hits rate limits.
+> 💡 **You only need ONE key to get started.** The app auto-falls back to the next available provider when one hits a rate limit.
 
 ---
 
@@ -137,7 +166,7 @@
 
 ### Prerequisites
 - Node.js v18+
-- npm or bun
+- npm
 
 ### Install & Run
 
@@ -149,11 +178,11 @@ cd ai-interview-copilot
 # Install dependencies
 npm install
 
-# Start the app (2 terminals)
-# Terminal 1:
+# Start (needs 2 terminals)
+# Terminal 1 — compile the Electron main process
 npx tsc -w -p tsconfig.electron.json
 
-# Terminal 2:
+# Terminal 2 — start Vite + Electron (auto-launches the app)
 npx vite
 ```
 
@@ -161,19 +190,23 @@ npx vite
 
 ### First Launch
 1. The **Onboarding screen** opens automatically
-2. Enter at least one free API key (Groq recommended)
+2. Enter at least one free API key — each provider shows its **branded SVG logo**
 3. Choose your default mode (General / Coding)
-4. Click **"Start Using AI Interview Copilot"**
+4. Review the **Hotkey Cheat Sheet** (shows your custom shortcuts live)
+5. Click **"Start Using AI Screen Assistant"**
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## ⌨️ Default Keyboard Shortcuts
+
+> All shortcuts are **fully remappable** in Settings → Shortcuts. Every UI element reads from the store and updates instantly.
 
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+H` | 📸 Take a screenshot |
-| `Ctrl+Enter` | 🤖 Analyze screenshots |
+| `Ctrl+Enter` | 🤖 Analyze screenshots / Solve |
 | `Ctrl+Shift+V` | 🎤 Toggle voice input |
+| `Ctrl+Shift+C` | 💬 Toggle chat mode |
 | `Ctrl+Shift+G` | 🔄 Toggle General / Coding mode |
 | `Ctrl+B` | 👁️ Show / Hide overlay |
 | `Ctrl+R` | 🔄 Clear and start over |
@@ -186,26 +219,40 @@ npx vite
 ## 🏗️ Architecture
 
 ```
-ai-interview-copilot/
+ai-screen-assistant/
 ├── electron/
-│   ├── main.ts              # Electron main process, window management
-│   ├── ipcHandlers.ts       # IPC bridge (screenshot, voice, AI routing)
-│   ├── ProcessingHelper.ts  # AI provider orchestration, multi-provider
+│   ├── main.ts              # Window management, IPC routing
+│   ├── ipcHandlers.ts       # Screenshot, voice, chat, AI handlers
+│   ├── ProcessingHelper.ts  # Multi-provider orchestration (vision/text fallback)
 │   ├── ScreenshotHelper.ts  # Cross-platform screen capture
-│   ├── storage.ts           # Encrypted key storage (electron-store)
+│   ├── storage.ts           # Encrypted key store (electron-store + TypedAppStore)
+│   ├── shortcuts.ts         # Global hotkey registration + customShortcuts store
 │   └── preload.ts           # Secure renderer ↔ main bridge
 ├── src/
-│   ├── App.tsx              # Root: onboarding, click-through, opacity
-│   ├── providers/           # Multi-provider AI adapters
+│   ├── App.tsx              # Root: onboarding, click-through, opacity, provider mgr
+│   ├── providers/
+│   │   ├── registry.ts       # Provider registry + vision detection
+│   │   ├── types.ts          # FullProviderAdapter, ProviderConfig interfaces
+│   │   ├── useProviderManager.ts  # React hook: order, models, reorderProviders
+│   │   └── adapters/         # One file per provider (gemini, groq, mistral…)
+│   ├── utils/
+│   │   ├── providerMeta.ts   # Per-model capability flags (vision/fast/reasoning)
+│   │   └── platform.ts       # COMMAND_KEY (⌘ / Ctrl)
 │   ├── components/
-│   │   ├── Onboarding/      # First-run setup wizard
-│   │   ├── VoiceInput/      # MediaRecorder + Whisper transcription
-│   │   ├── History/         # In-session answer history
-│   │   └── Settings/        # API key management
+│   │   ├── shared/
+│   │   │   └── ProviderLogo.tsx  # Inline SVG brand logos for all 8 providers
+│   │   ├── Queue/
+│   │   │   └── QueueCommands.tsx # Bottom bar — dynamic shortcuts from store
+│   │   ├── Onboarding/       # 5-step setup wizard (SVG logos + hotkey cheat sheet)
+│   │   ├── VoiceInput/       # MediaRecorder + Whisper transcription
+│   │   ├── ChatInput/        # Multi-turn chat panel
+│   │   ├── History/          # In-session answer history
+│   │   └── Settings/         # API keys + shortcut remapping
 │   └── _pages/
-│       ├── Queue.tsx        # Screenshot queue view
-│       └── Solutions.tsx    # AI answer display
-└── vite.config.ts           # Vite + vite-plugin-electron
+│       ├── SubscribedApp.tsx  # Overlay shell: custom dropdowns + capability badges
+│       ├── Queue.tsx          # Screenshot queue view
+│       └── Solutions.tsx      # AI answer display
+└── vite.config.ts             # Vite + vite-plugin-electron
 ```
 
 ---
@@ -221,8 +268,9 @@ ai-interview-copilot/
 | Build | Vite + vite-plugin-electron |
 | Styling | Tailwind CSS + Radix UI |
 | AI Routing | Custom multi-provider orchestrator |
-| Voice | MediaRecorder + Whisper API |
-| Storage | electron-store (encrypted) |
+| Voice | MediaRecorder + Groq Whisper API |
+| Storage | electron-store (TypedAppStore wrapper) |
+| Icons | Inline SVG brand logos (no dependencies) |
 
 </div>
 
@@ -234,6 +282,7 @@ ai-interview-copilot/
 - ✅ **Screenshots stay local** — temporarily saved to `AppData/Roaming`, deleted after processing
 - ✅ **No telemetry, no analytics, no accounts**
 - ✅ **Open source** — read every line of code yourself
+- ✅ **TypedAppStore** — typed wrapper around `electron-store` for safe, schema-validated key access
 
 ---
 
@@ -247,8 +296,6 @@ Contributions are welcome! Here's how to get started:
 4. Push: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
 ---
 
 ## 📄 License
@@ -258,7 +305,6 @@ This project is licensed under the **GNU Affero General Public License v3.0 (AGP
 - ✅ Free to use, modify, and distribute
 - ✅ Modifications must stay open source under the same license
 - ✅ Network use (SaaS) requires source disclosure
-
 
 ---
 

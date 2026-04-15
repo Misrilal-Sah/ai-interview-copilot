@@ -1,6 +1,6 @@
 // ipcHandlers.ts
 
-import { ipcMain, shell, dialog } from "electron"
+import { ipcMain, shell, dialog, clipboard } from "electron"
 import { randomBytes } from "crypto"
 import { IIpcHandlerDeps } from "./main"
 import { configHelper } from "./ConfigHelper"
@@ -28,19 +28,15 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   ipcMain.handle("check-api-key", () => {
     return configHelper.hasApiKey();
   })
-  
-  ipcMain.handle("validate-api-key", async (_event, apiKey) => {
-    // First check the format
-    if (!configHelper.isValidApiKeyFormat(apiKey)) {
-      return { 
-        valid: false, 
-        error: "Invalid API key format. OpenAI API keys start with 'sk-'" 
-      };
+
+  // Native clipboard write — used by all copy buttons (avoids DOM textarea flicker)
+  ipcMain.handle("write-clipboard", (_event, text: string) => {
+    try {
+      clipboard.writeText(String(text))
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
     }
-    
-    // Then test the API key with OpenAI
-    const result = await configHelper.testApiKey(apiKey);
-    return result;
   })
 
   // Credits handlers
@@ -99,8 +95,10 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   // Screenshot processing handlers
   ipcMain.handle("process-screenshots", async () => {
-    // Check for API key before processing
-    if (!configHelper.hasApiKey()) {
+    // Check for API key before processing — check both old config AND new provider storage
+    const hasLegacyKey = configHelper.hasApiKey();
+    const hasNewProviderKey = getAllSavedProviderIds().length > 0;
+    if (!hasLegacyKey && !hasNewProviderKey) {
       const mainWindow = deps.getMainWindow();
       if (mainWindow) {
         mainWindow.webContents.send(deps.PROCESSING_EVENTS.API_KEY_INVALID);
@@ -242,8 +240,10 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   // Process screenshot handlers
   ipcMain.handle("trigger-process-screenshots", async () => {
     try {
-      // Check for API key before processing
-      if (!configHelper.hasApiKey()) {
+      // Check for API key before processing — check both old config AND new provider storage
+      const hasLegacyKey = configHelper.hasApiKey();
+      const hasNewProviderKey = getAllSavedProviderIds().length > 0;
+      if (!hasLegacyKey && !hasNewProviderKey) {
         const mainWindow = deps.getMainWindow();
         if (mainWindow) {
           mainWindow.webContents.send(deps.PROCESSING_EVENTS.API_KEY_INVALID);
@@ -418,9 +418,21 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
     }
   })
 
+  // ── Chat Question Handler ─────────────────────────────────────────────────────
+
+  ipcMain.handle("process-chat-question", async (_event, message: string, history: Array<{ role: "user" | "assistant"; content: string }>) => {
+    try {
+      const result = await deps.processingHelper?.processChatQuestion(message, history)
+      return result ?? { success: false, error: "Processing helper not initialized" }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
+      return { success: false, error: msg }
+    }
+  })
+
   // ── Audio Transcription (Voice Input) ────────────────────────────────────────
   // Receives base64 WebM audio from the renderer, transcribes via Groq Whisper
-  // (fastest free option) or any OpenAI-compatible API the user has configured.
+  // (fastest free option). Falls back to other providers that support Whisper.
   ipcMain.handle("transcribe-audio", async (_event, base64Audio: string, mimeType: string) => {
     try {
       const fs = await import("fs")
@@ -434,44 +446,50 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       const audioBuffer = Buffer.from(base64Audio, "base64")
       fs.writeFileSync(tempPath, audioBuffer)
 
-      // Prefer Groq (ultra-fast Whisper) → OpenAI → Groq fallback
-      const providerPriority = ["groq", "openai", "openrouter", "gemini", "github"]
+      // Provider priority for Whisper transcription:
+      // Groq — free, ultra-fast Whisper API (primary choice)
+      // openrouter — supports audio transcriptions for some models
+      // openai — standard Whisper (only if user has key)
+      // NOTE: Mistral, Gemini, Cerebras do NOT have Whisper endpoints
+      const whisperProviders = ["groq", "openrouter", "openai"]
       let apiKey: string | null = null
       let chosenProvider = ""
 
-      for (const pid of providerPriority) {
+      for (const pid of whisperProviders) {
         try {
-          const k = await getApiKey(pid)
+          const k = getApiKey(pid)
           if (k) { apiKey = k; chosenProvider = pid; break }
         } catch { /* skip */ }
       }
 
       if (!apiKey) {
-        fs.unlinkSync(tempPath)
-        return { success: false, error: "No API key configured. Add a key in Settings (Groq or OpenAI recommended for voice)." }
+        try { fs.unlinkSync(tempPath) } catch { /* ignore */ }
+        return {
+          success: false,
+          error: "No transcription provider available. Add a free Groq API key in Settings (groq.com) to enable voice input."
+        }
       }
 
       console.log(`Transcribing audio via ${chosenProvider}...`)
 
-      // Use FormData multipart upload to Whisper API ─────────────────────────
+      // Determine API endpoint and model by provider
+      const endpointMap: Record<string, { host: string; path: string; model: string }> = {
+        groq:       { host: "api.groq.com",  path: "/openai/v1/audio/transcriptions", model: "whisper-large-v3-turbo" },
+        openrouter: { host: "openrouter.ai",  path: "/api/v1/audio/transcriptions",   model: "whisper-1" },
+        openai:     { host: "api.openai.com", path: "/v1/audio/transcriptions",        model: "whisper-1" },
+      }
+      const endpoint = endpointMap[chosenProvider] ?? endpointMap["groq"]
+
+      // Build multipart body
       const fileData = fs.readFileSync(tempPath)
       const boundary = `----FormBoundary${Date.now()}`
       const filename = `audio.${ext}`
 
-      // Determine API endpoint by provider
-      const endpointMap: Record<string, { host: string; path: string }> = {
-        groq:      { host: "api.groq.com",         path: "/openai/v1/audio/transcriptions" },
-        openai:    { host: "api.openai.com",        path: "/v1/audio/transcriptions" },
-        openrouter:{ host: "openrouter.ai",         path: "/api/v1/audio/transcriptions" },
-      }
-      const endpoint = endpointMap[chosenProvider] ?? endpointMap["openai"]
-
-      // Build multipart body
       const parts: Buffer[] = []
       const addField = (name: string, value: string) => {
         parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`))
       }
-      addField("model", chosenProvider === "groq" ? "whisper-large-v3-turbo" : "whisper-1")
+      addField("model", endpoint.model)
       addField("response_format", "json")
       parts.push(
         Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType || "audio/webm"}\r\n\r\n`),
@@ -498,7 +516,7 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
             try {
               const json = JSON.parse(data)
               if (json.text) resolve(json.text.trim())
-              else reject(new Error(json.error?.message ?? data))
+              else reject(new Error(json.error?.message ?? `HTTP ${res.statusCode}: ${data}`))
             } catch { reject(new Error(data)) }
           })
         })

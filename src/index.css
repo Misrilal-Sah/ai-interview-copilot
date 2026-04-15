@@ -20,6 +20,34 @@ html, body {
   overflow: hidden;
 }
 
+/* ── Custom Scrollbar (Webkit + Firefox) ───────────────── */
+/* Thin, themed scrollbar that matches the overlay aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) rgba(255, 255, 255, 0.03);
+}
+
 
 /* Custom animations for UI elements */
 @keyframes fadeIn {
@@ -34,17 +62,48 @@ html, body {
   will-change: opacity, transform;
 }
 
-/* Custom styling for dropdowns */
+/* ── Custom Styled Dropdowns ──────────────────────────── */
+/* Replaces ugly native selects with dark-themed styling */
 select {
-  appearance: menulist;
-  background-color: #000000 !important;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: rgba(255, 255, 255, 0.05) !important;
   color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 32px 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+}
+
+select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+select:focus {
+  border-color: rgba(96, 165, 250, 0.5);
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.15);
 }
 
 option {
-  background-color: #1a1a1a !important;
+  background-color: #1a1a2e !important;
   color: white !important;
-  padding: 8px !important;
+  padding: 10px 12px !important;
+  font-size: 13px;
+}
+
+option:hover,
+option:checked {
+  background-color: #2a2a4a !important;
 }
 
 .frosted-glass {

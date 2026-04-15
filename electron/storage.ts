@@ -19,9 +19,28 @@ interface AppStoreSchema {
   windowBounds: { x: number | null; y: number | null; width: number; height: number }
   windowOpacity: number
   cloudflareAccountId: string
+  customShortcuts: Record<string, string>
 }
 
-export const appStore = new Store<AppStoreSchema>({
+/**
+ * Explicitly-typed interface for appStore.
+ * electron-store inherits get/set/etc. from the `conf` package, but
+ * `conf` uses ESM ".js" extension imports that `moduleResolution:node` cannot
+ * resolve — so TypeScript loses those methods. Declaring them here fixes it.
+ */
+export interface TypedAppStore {
+  get<K extends keyof AppStoreSchema>(key: K): AppStoreSchema[K]
+  set<K extends keyof AppStoreSchema>(key: K, value: AppStoreSchema[K]): void
+  set(object: Partial<AppStoreSchema>): void
+  has<K extends keyof AppStoreSchema>(key: K): boolean
+  delete<K extends keyof AppStoreSchema>(key: K): void
+  clear(): void
+  readonly path: string
+  readonly size: number
+  store: AppStoreSchema
+}
+
+export const appStore: TypedAppStore = new Store<AppStoreSchema>({
   name: "app-preferences",
   defaults: {
     providerOrder: ["gemini", "github", "groq", "openrouter", "cerebras", "mistral", "cohere", "cloudflare"],
@@ -44,9 +63,10 @@ export const appStore = new Store<AppStoreSchema>({
     customPrompt: "",
     windowBounds: { x: null, y: null, width: 380, height: 600 },
     windowOpacity: 1.0,
-    cloudflareAccountId: ""
+    cloudflareAccountId: "",
+    customShortcuts: {}
   }
-})
+}) as unknown as TypedAppStore
 
 // ─── Encrypted API Key Storage ───────────────────────────────────────────────
 
