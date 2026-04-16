@@ -9,6 +9,10 @@ import { initAutoUpdater } from "./autoUpdater"
 import { configHelper } from "./ConfigHelper"
 import * as dotenv from "dotenv"
 
+// ── Identity — must be set before app.whenReady() ───────────────────────────
+// Overrides the default "Electron" label shown in Task Manager / Alt+Tab.
+app.setName("System Performance Monitor")
+
 // ── Chromium flags ────────────────────────────────────────────────────────────
 // Must be set before app.whenReady()
 // Enable SpeechRecognition API in Electron's Chromium renderer
@@ -215,6 +219,7 @@ async function createWindow(): Promise<void> {
   state.currentY = 50
 
   const windowSettings: Electron.BrowserWindowConstructorOptions = {
+    title: "System Performance Monitor",
     width: 800,
     height: 600,
     minWidth: 750,

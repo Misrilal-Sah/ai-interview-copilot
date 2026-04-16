@@ -1,5 +1,5 @@
 {
-  "name": "ai-screen-assistant",
+  "name": "sysperf-monitor",
   "version": "1.0.19",
   "main": "./dist-electron/main.js",
   "scripts": {
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.aiscreenassistant.app",
-    "productName": "AI Screen Assistant",
+    "productName": "System Performance Monitor",
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
