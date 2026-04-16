@@ -92,8 +92,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "ibttf",
-        "repo": "interview-coder",
+        "owner": "Misrilal-Sah",
+        "repo": "ai-interview-copilot",
         "private": false,
         "releaseType": "release"
       }
