@@ -1,5 +1,5 @@
 // Solutions.tsx
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism"
@@ -182,7 +182,6 @@ const Solutions: React.FC<SolutionsProps> = ({
   setLanguage
 }) => {
   const queryClient = useQueryClient()
-  const contentRef = useRef<HTMLDivElement>(null)
 
   const [debugProcessing, setDebugProcessing] = useState(false)
   const [problemStatementData, setProblemStatementData] =
@@ -232,27 +231,9 @@ const Solutions: React.FC<SolutionsProps> = ({
   const { showToast } = useToast()
 
   useEffect(() => {
-    // Height update logic
-    const updateDimensions = () => {
-      if (contentRef.current) {
-        const maxHeight = Math.floor(window.screen.height * 0.82)
-        // Cap the reported height so the Electron window doesn't grow offscreen.
-        // The div itself scrolls internally via overflow-y: auto.
-        const contentHeight = Math.min(contentRef.current.scrollHeight, maxHeight)
-        const contentWidth = contentRef.current.scrollWidth
-        window.electronAPI.updateContentDimensions({
-          width: contentWidth,
-          height: contentHeight
-        })
-      }
-    }
-
-    // Initialize resize observer
-    const resizeObserver = new ResizeObserver(updateDimensions)
-    if (contentRef.current) {
-      resizeObserver.observe(contentRef.current)
-    }
-    updateDimensions()
+    // NOTE: Window dimension tracking is handled by SubscribedApp's debounced
+    // ResizeObserver on the outer container. Do NOT add a second ResizeObserver
+    // here — dual observers create a feedback loop that makes the window blink.
 
     // Set up event listeners
     const cleanupFunctions = [
@@ -388,7 +369,6 @@ const Solutions: React.FC<SolutionsProps> = ({
     ]
 
     return () => {
-      resizeObserver.disconnect()
       cleanupFunctions.forEach((cleanup) => cleanup())
     }
   }, [])
@@ -475,7 +455,6 @@ const Solutions: React.FC<SolutionsProps> = ({
         />
       ) : (
         <div
-          ref={contentRef}
           className="relative"
           style={{
             maxHeight: "82vh",

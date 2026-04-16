@@ -224,7 +224,7 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   }, [view, queryClient, showToast])
 
   // ── Derived top-bar info ──────────────────────────────────────────────────
-  const activeProvider = activeVisionProvider ?? activeTextProvider
+  const activeProvider = activeTextProvider ?? activeVisionProvider
   const providerDot = activeProvider
     ? (activeProvider.keySaved ? "bg-green-400" : "bg-yellow-400")
     : "bg-red-400"
