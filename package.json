@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.aiscreenassistant.app",
-    "productName": "System Performance Monitor",
+    "productName": "AI Interview Copilot",
     "files": [
       "dist/**/*",
       "dist-electron/**/*",

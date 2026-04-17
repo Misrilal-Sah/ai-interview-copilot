@@ -85,6 +85,9 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   // Chat panel state
   const [showChat, setShowChat] = useState(false)
 
+  // Screenshot attached to chat (sent via Ctrl+Shift+S)
+  const [chatAttachedScreenshot, setChatAttachedScreenshot] = useState<{ path: string; preview: string } | null>(null)
+
   // Custom dropdown state
   const providerDd = useDropdown()
   const modelDd = useDropdown()
@@ -113,6 +116,15 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   useEffect(() => {
     const unsub = window.electronAPI.onChatToggle(() => {
       setShowChat(prev => !prev)
+    })
+    return unsub
+  }, [])
+
+  // Listen for send-screenshot-to-chat hotkey (Ctrl+Shift+S)
+  useEffect(() => {
+    const unsub = window.electronAPI.onSendScreenshotToChat((data) => {
+      setChatAttachedScreenshot(data)
+      setShowChat(true) // auto-open chat
     })
     return unsub
   }, [])
@@ -439,6 +451,8 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       <ChatInput
         isOpen={showChat}
         onClose={() => setShowChat(false)}
+        attachedScreenshot={chatAttachedScreenshot}
+        onClearAttachedScreenshot={() => setChatAttachedScreenshot(null)}
         onAddToHistory={(entry) => {
           const historyEntry: HistoryEntry = {
             id: `${Date.now()}-chat`,

@@ -47,6 +47,7 @@ export const DEFAULT_SHORTCUTS: Record<string, string> = {
   toggleVoice: "CommandOrControl+Shift+V",
   toggleMode: "CommandOrControl+Shift+G",
   toggleChat: "CommandOrControl+Shift+C",
+  sendScreenshotToChat: "CommandOrControl+Shift+S",
   quitApp: "CommandOrControl+Q"
 }
 
@@ -68,6 +69,7 @@ const SHORTCUT_LABELS: Record<string, string> = {
   toggleVoice: "Toggle Voice Input",
   toggleMode: "Toggle Mode (General/Coding)",
   toggleChat: "Toggle Chat",
+  sendScreenshotToChat: "Send Screenshot to Chat",
   quitApp: "Quit App"
 }
 type KeyStatus = "none" | "saved" | "working" | "failed"

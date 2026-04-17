@@ -420,9 +420,9 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   // ── Chat Question Handler ─────────────────────────────────────────────────────
 
-  ipcMain.handle("process-chat-question", async (_event, message: string, history: Array<{ role: "user" | "assistant"; content: string }>) => {
+  ipcMain.handle("process-chat-question", async (_event, message: string, history: Array<{ role: "user" | "assistant"; content: string }>, imageBase64?: string | null) => {
     try {
-      const result = await deps.processingHelper?.processChatQuestion(message, history)
+      const result = await deps.processingHelper?.processChatQuestion(message, history, imageBase64 ?? null)
       return result ?? { success: false, error: "Processing helper not initialized" }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error)

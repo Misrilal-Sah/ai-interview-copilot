@@ -22,6 +22,7 @@ const DEFAULT_SHORTCUTS: Record<string, string> = {
   toggleVoice: "CommandOrControl+Shift+V",
   toggleMode: "CommandOrControl+Shift+G",
   toggleChat: "CommandOrControl+Shift+C",
+  sendScreenshotToChat: "CommandOrControl+Shift+S",
   quitApp: "CommandOrControl+Q"
 }
 
@@ -228,6 +229,35 @@ export class ShortcutsHelper {
       const mainWindow = this.deps.getMainWindow()
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("toggle-chat")
+      }
+    })
+
+    this.safeRegister(s.sendScreenshotToChat, "sendScreenshotToChat", async () => {
+      console.log("Sending latest screenshot to chat.")
+      const mainWindow = this.deps.getMainWindow()
+      if (!mainWindow || mainWindow.isDestroyed()) return
+
+      try {
+        // Get the latest screenshot from either queue
+        const screenshotHelper = this.deps.getScreenshotHelper()
+        const queue = screenshotHelper.getScreenshotQueue()
+        const extraQueue = screenshotHelper.getExtraScreenshotQueue()
+        const allScreenshots = [...queue, ...extraQueue]
+
+        if (allScreenshots.length === 0) {
+          console.log("No screenshots to send to chat.")
+          return
+        }
+
+        // Get the latest screenshot
+        const latestPath = allScreenshots[allScreenshots.length - 1]
+        const preview = await screenshotHelper.getImagePreview(latestPath)
+
+        if (preview) {
+          mainWindow.webContents.send("send-screenshot-to-chat", { path: latestPath, preview })
+        }
+      } catch (error) {
+        console.error("Error sending screenshot to chat:", error)
       }
     })
 

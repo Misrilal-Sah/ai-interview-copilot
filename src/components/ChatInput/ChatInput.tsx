@@ -1,6 +1,6 @@
 // src/components/ChatInput/ChatInput.tsx — Multi-turn chatbot panel for the overlay
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Send, X, Trash2, Copy, ChevronDown } from "lucide-react"
+import { Send, X, Trash2, Copy, ChevronDown, ImageIcon } from "lucide-react"
 
 export interface ChatMessage {
   role: "user" | "assistant"
@@ -13,6 +13,8 @@ export interface ChatMessage {
 interface ChatInputProps {
   isOpen: boolean
   onClose: () => void
+  attachedScreenshot?: { path: string; preview: string } | null
+  onClearAttachedScreenshot?: () => void
   onAddToHistory?: (entry: {
     question: string
     answer: string
@@ -21,7 +23,7 @@ interface ChatInputProps {
   }) => void
 }
 
-export function ChatInput({ isOpen, onClose, onAddToHistory }: ChatInputProps) {
+export function ChatInput({ isOpen, onClose, attachedScreenshot, onClearAttachedScreenshot, onAddToHistory }: ChatInputProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
@@ -65,6 +67,16 @@ export function ChatInput({ isOpen, onClose, onAddToHistory }: ChatInputProps) {
     setInput("")
     setLoading(true)
 
+    // If there's an attached screenshot, extract its base64 data for the API call
+    let imageBase64: string | null = null
+    if (attachedScreenshot?.preview) {
+      // preview is "data:image/png;base64,XXXX" — extract the base64 part
+      const base64Match = attachedScreenshot.preview.match(/^data:image\/[^;]+;base64,(.+)$/)
+      if (base64Match) {
+        imageBase64 = base64Match[1]
+      }
+    }
+
     try {
       // Build history for the API (exclude the current message)
       const history = [...messages, userMessage].map(m => ({
@@ -72,7 +84,7 @@ export function ChatInput({ isOpen, onClose, onAddToHistory }: ChatInputProps) {
         content: m.content
       }))
 
-      const result = await window.electronAPI.processChatQuestion(text, history)
+      const result = await window.electronAPI.processChatQuestion(text, history, imageBase64)
 
       if (result.success && result.text) {
         const assistantMessage: ChatMessage = {
@@ -108,9 +120,13 @@ export function ChatInput({ isOpen, onClose, onAddToHistory }: ChatInputProps) {
       }])
     } finally {
       setLoading(false)
+      // Clear attached screenshot after first message is sent with it
+      if (imageBase64) {
+        onClearAttachedScreenshot?.()
+      }
       inputRef.current?.focus()
     }
-  }, [input, loading, messages, onAddToHistory])
+  }, [input, loading, messages, onAddToHistory, attachedScreenshot, onClearAttachedScreenshot])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -254,6 +270,25 @@ export function ChatInput({ isOpen, onClose, onAddToHistory }: ChatInputProps) {
             target.style.height = Math.min(target.scrollHeight, 80) + "px"
           }}
         />
+
+        {/* Attached screenshot thumbnail */}
+        {attachedScreenshot && (
+          <div className="relative flex-shrink-0">
+            <img
+              src={attachedScreenshot.preview}
+              alt="Attached screenshot"
+              className="w-8 h-8 rounded-md object-cover border border-white/20"
+            />
+            <button
+              onClick={() => onClearAttachedScreenshot?.()}
+              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-400 transition-colors"
+              title="Remove attached screenshot"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </div>
+        )}
+
         <button
           onClick={handleSend}
           disabled={!input.trim() || loading}

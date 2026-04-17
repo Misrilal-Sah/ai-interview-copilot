@@ -11,7 +11,7 @@ import * as dotenv from "dotenv"
 
 // ── Identity — must be set before app.whenReady() ───────────────────────────
 // Overrides the default "Electron" label shown in Task Manager / Alt+Tab.
-app.setName("System Performance Monitor")
+app.setName("AI Interview Copilot")
 
 // ── Chromium flags ────────────────────────────────────────────────────────────
 // Must be set before app.whenReady()
@@ -88,6 +88,7 @@ export interface IShortcutsHelperDeps {
   getMainWindow: () => BrowserWindow | null
   takeScreenshot: () => Promise<string>
   getImagePreview: (filepath: string) => Promise<string>
+  getScreenshotHelper: () => ScreenshotHelper
   processingHelper: ProcessingHelper | null
   clearQueues: () => void
   setView: (view: "queue" | "solutions" | "debug") => void
@@ -145,6 +146,7 @@ function initializeHelpers() {
     getMainWindow,
     takeScreenshot,
     getImagePreview,
+    getScreenshotHelper: () => state.screenshotHelper!,
     processingHelper: state.processingHelper,
     clearQueues,
     setView,
@@ -219,7 +221,7 @@ async function createWindow(): Promise<void> {
   state.currentY = 50
 
   const windowSettings: Electron.BrowserWindowConstructorOptions = {
-    title: "System Performance Monitor",
+    title: "AI Interview Copilot",
     width: 800,
     height: 600,
     minWidth: 750,

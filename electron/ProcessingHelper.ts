@@ -717,7 +717,8 @@ export class ProcessingHelper {
    */
   public async processChatQuestion(
     message: string,
-    history: Array<{ role: "user" | "assistant"; content: string }>
+    history: Array<{ role: "user" | "assistant"; content: string }>,
+    imageBase64?: string | null
   ): Promise<{
     success: boolean
     text?: string
@@ -734,14 +735,31 @@ export class ProcessingHelper {
       const answerLanguage = ((appStore as any).get("answerLanguage") as string) ?? "auto"
       const prompt = buildChatPrompt(message, history, customPrompt, answerLanguage)
 
+      const hasImage = !!imageBase64
       const skipIds: string[] = []
       for (let attempt = 0; attempt < 8; attempt++) {
-        const provider = await this.getActiveProviderAndKey(false, skipIds)
+        // If there's an image, try vision provider first
+        const provider = await this.getActiveProviderAndKey(hasImage, skipIds)
         if (!provider) {
+          // If no vision provider found but we have an image, fall back to text-only
+          if (hasImage) {
+            const textProvider = await this.getActiveProviderAndKey(false, skipIds)
+            if (!textProvider) {
+              return { success: false, error: "No AI provider configured. Please add an API key in Settings." }
+            }
+            const response = await textProvider.adapter.call(
+              textProvider.apiKey, prompt, null, textProvider.model, "", textProvider.accountId
+            )
+            if (response.error && response.error.includes("Rate limit")) {
+              skipIds.push(textProvider.adapter.config.id)
+              continue
+            }
+            return { success: !response.error, text: response.text, providerId: response.providerId, model: response.model, error: response.error }
+          }
           return { success: false, error: "No AI provider configured. Please add an API key in Settings." }
         }
         const response = await provider.adapter.call(
-          provider.apiKey, prompt, null, provider.model, "", provider.accountId
+          provider.apiKey, prompt, hasImage ? imageBase64 : null, provider.model, "", provider.accountId
         )
         if (response.error && response.error.includes("Rate limit")) {
           skipIds.push(provider.adapter.config.id)

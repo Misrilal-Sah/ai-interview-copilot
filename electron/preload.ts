@@ -281,12 +281,17 @@ const electronAPI = {
     ipcRenderer.invoke("transcribe-audio", base64Audio, mimeType),
 
   // ── Chat (text chatbot) ────────────────────────────────────────────────────
-  processChatQuestion: (message: string, history: Array<{ role: "user" | "assistant"; content: string }>) =>
-    ipcRenderer.invoke("process-chat-question", message, history),
+  processChatQuestion: (message: string, history: Array<{ role: "user" | "assistant"; content: string }>, imageBase64?: string | null) =>
+    ipcRenderer.invoke("process-chat-question", message, history, imageBase64 ?? null),
   onChatToggle: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on("toggle-chat", subscription)
     return () => ipcRenderer.removeListener("toggle-chat", subscription)
+  },
+  onSendScreenshotToChat: (callback: (data: { path: string; preview: string }) => void) => {
+    const subscription = (_: unknown, data: { path: string; preview: string }) => callback(data)
+    ipcRenderer.on("send-screenshot-to-chat", subscription)
+    return () => ipcRenderer.removeListener("send-screenshot-to-chat", subscription)
   },
 
   // ── Window opacity control ──────────────────────────────────────────────────

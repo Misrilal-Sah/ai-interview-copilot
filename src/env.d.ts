@@ -107,6 +107,17 @@ interface ElectronAPI {
 
   // ── Voice transcription ────────────────────────────────────────────────────
   transcribeAudio: (base64Audio: string, mimeType: string) => Promise<{ success: boolean; transcript?: string; error?: string }>
+
+  // ── Chat ────────────────────────────────────────────────────────────────────
+  processChatQuestion: (message: string, history: Array<{ role: "user" | "assistant"; content: string }>, imageBase64?: string | null) => Promise<{
+    success: boolean
+    text?: string
+    providerId?: string
+    model?: string
+    error?: string
+  }>
+  onChatToggle: (callback: () => void) => () => void
+  onSendScreenshotToChat: (callback: (data: { path: string; preview: string }) => void) => () => void
 }
 
 interface Window {

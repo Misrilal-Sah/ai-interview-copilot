@@ -11,6 +11,12 @@ html, body {
   height: 100%;
   width: 100%;
   user-select: none;        /* prevent text selection on drag */
+  cursor: default !important;
+}
+
+/* ── Force default cursor everywhere ──────────────────── */
+*, *::before, *::after {
+  cursor: default !important;
 }
 
 #root {
