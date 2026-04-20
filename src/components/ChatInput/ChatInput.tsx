@@ -55,11 +55,13 @@ export function ChatInput({ isOpen, onClose, attachedScreenshot, onClearAttached
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
-    if (!text || loading) return
+    const hasScreenshot = !!attachedScreenshot?.preview
+    // Allow send if there's text OR an attached screenshot
+    if ((!text && !hasScreenshot) || loading) return
 
     const userMessage: ChatMessage = {
       role: "user",
-      content: text,
+      content: text || "📷 [Screenshot attached]",
       timestamp: new Date()
     }
 
@@ -254,7 +256,7 @@ export function ChatInput({ isOpen, onClose, attachedScreenshot, onClearAttached
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything… (Enter to send, Shift+Enter for newline)"
+          placeholder={attachedScreenshot ? "Ask about the screenshot… or press Enter to send as-is" : "Ask anything… (Enter to send, Shift+Enter for newline)"}
           rows={1}
           disabled={loading}
           className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none resize-none focus:border-white/25 placeholder:text-white/30 disabled:opacity-50"
@@ -291,10 +293,10 @@ export function ChatInput({ isOpen, onClose, attachedScreenshot, onClearAttached
 
         <button
           onClick={handleSend}
-          disabled={!input.trim() || loading}
+          disabled={(!input.trim() && !attachedScreenshot?.preview) || loading}
           title="Send message"
           className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg transition-all ${
-            input.trim() && !loading
+            (input.trim() || attachedScreenshot?.preview) && !loading
               ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
               : "bg-white/5 text-white/20 cursor-not-allowed"
           }`}
